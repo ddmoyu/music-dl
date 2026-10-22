@@ -1,0 +1,40 @@
+{
+  "$schema": "https://raw.githubusercontent.com/neutralinojs/neutralinojs/main/schemas/neutralino.config.schema.json",
+  "applicationId": "io.musicservice.shiyin",
+  "version": "0.1.0",
+  "defaultMode": "window",
+  "port": 0,
+  "documentRoot": "/dist/prototype/",
+  "url": "/",
+  "enableServer": true,
+  "enableNativeAPI": true,
+  "tokenSecurity": "one-time",
+  "nativeAllowList": [
+    "app.exit",
+    "os.showFolderDialog",
+    "os.open",
+    "os.getPath",
+    "storage.getData",
+    "storage.setData"
+  ],
+  "modes": {
+    "window": {
+      "title": "拾音 · 音乐下载",
+      "width": 820,
+      "height": 820,
+      "minWidth": 720,
+      "minHeight": 640,
+      "center": true,
+      "resizable": true,
+      "injectGlobals": true,
+      "enableInspector": false,
+      "exitProcessOnClose": true
+    }
+  },
+  "cli": {
+    "binaryName": "shiyin",
+    "resourcesPath": "/dist/prototype/",
+    "distributionPath": "/release/",
+    "binaryVersion": "6.5.0"
+  }
+}

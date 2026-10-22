@@ -1,0 +1,10 @@
+node_modules/
+dist/
+release/
+bin/
+.tmp/
+.storage/
+coverage/
+test-results/
+pnpm-lock.yaml
+prototype/public/licenses/
