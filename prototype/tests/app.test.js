@@ -1,97 +1,132 @@
 // @vitest-environment happy-dom
 import { expect, it, vi } from 'vitest';
-vi.mock('@neutralinojs/lib', () => ({ init: vi.fn(), os: {}, storage: {} }));
+vi.mock('@neutralinojs/lib', () => ({ init: vi.fn(), storage: {} }));
 
-it('preserves search, batch download, queue controls, settings and dialog interactions', async () => {
+it('loads virtual pages, preserves offscreen selection, navigates artist scopes, imports links and manages batches', async () => {
     vi.useFakeTimers();
     localStorage.clear();
     document.body.innerHTML = '<div id="root"></div>';
     await import('../app/main.js');
     const root = document.getElementById('root');
     const click = (selector) => {
-        const element = root.querySelector(selector);
-        expect(element, selector).not.toBeNull();
-        element.click();
+        const el = root.querySelector(selector);
+        expect(el, selector).not.toBeNull();
+        el.click();
     };
     const change = (selector, value) => {
-        const element = root.querySelector(selector);
-        element.value = value;
-        element.dispatchEvent(new Event('change', { bubbles: true }));
+        const el = root.querySelector(selector);
+        el.value = value;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
     };
-    const search = (value) => {
-        const input = root.querySelector('#search-input');
-        input.value = value;
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        root.querySelector('[data-form="search"]').dispatchEvent(
-            new Event('submit', { bubbles: true, cancelable: true }),
-        );
+    const input = (selector, value) => {
+        const el = root.querySelector(selector);
+        el.value = value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    const submit = (form) =>
+        root
+            .querySelector(`[data-form="${form}"]`)
+            .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    const settle = () => vi.advanceTimersByTimeAsync(200);
+    const search = async (value) => {
+        input('#search-input', value);
+        submit('search');
+        await settle();
     };
     const tasks = () => JSON.parse(localStorage.getItem('shiyin.tasks.v1'));
     try {
-        search('周杰伦');
-        expect(root.querySelectorAll('tbody tr').length).toBeGreaterThan(5);
-        click('[data-select-all]');
-        expect(root.querySelectorAll('tbody input:checked').length).toBeGreaterThan(5);
+        change('#source', 'kuwo');
+        await search('林间集');
+        expect(root.querySelector('[role="table"]').getAttribute('aria-rowcount')).toBe('1201');
+        expect(root.querySelectorAll('.track-row').length).toBeLessThan(25);
+        const firstId = root.querySelector('[data-select]').dataset.select;
+        click('[data-select]');
+        const scroll = root.querySelector('.virtual-scroll');
+        scroll.scrollTop = 2900;
+        scroll.dispatchEvent(new Event('scroll'));
+        await settle();
+        expect(root.querySelector('.load-status').textContent).toContain('100 / 1200');
+        expect(root.querySelectorAll('.track-row').length).toBeLessThan(25);
+        expect(root.querySelector(`[data-select="${firstId}"]`)).toBeNull();
+        expect(root.querySelector('.selection-count').textContent).toContain('1');
+        scroll.scrollTop = 0;
+        scroll.dispatchEvent(new Event('scroll'));
+        await settle();
+        expect(root.querySelector(`[data-select="${firstId}"]`).checked).toBe(true);
+        input('#search-input', '新的草稿');
+        const field = root.querySelector('#search-input');
+        field.focus();
+        field.setSelectionRange(1, 2);
         click('[data-action="download-selected"]');
-        vi.advanceTimersByTime(600);
-        expect(tasks().filter((t) => t.status === 'downloading')).toHaveLength(3);
-        const input = root.querySelector('#search-input');
-        input.focus();
-        input.setSelectionRange(1, 2);
-        click('tbody input');
-        vi.advanceTimersByTime(600);
-        expect(root.querySelector('#search-input')).toBe(input);
-        expect(input.selectionStart).toBe(1);
-        expect(root.querySelectorAll('tbody input:checked')).toHaveLength(1);
-        click('[data-action="toggle-all"]');
-        const paused = tasks().map((t) => t.progress);
-        vi.advanceTimersByTime(1200);
-        expect(tasks().map((t) => t.progress)).toEqual(paused);
-        expect(tasks().every((t) => t.status === 'paused')).toBe(true);
-        click('[data-action="collapse-queue"]');
-        expect(root.querySelector('.queue-drawer').inert).toBe(true);
-        expect(root.querySelector('.queue-drawer').getAttribute('aria-hidden')).toBe('true');
-        click('[data-action="status"]');
-        expect(root.querySelector('.queue-drawer').inert).toBe(false);
-        click('[data-action="settings"]');
-        change('[data-setting="quality"]', 'lossless');
-        click('[data-action="concurrency"][data-id="-1"]');
-        expect(JSON.parse(localStorage.getItem('shiyin.settings.v1')).concurrency).toBe(2);
-        click('[data-action="choose-directory"]');
-        expect(document.activeElement.id).toBe('directory-input');
-        expect(root.querySelector('main').inert).toBe(true);
-        const directory = root.querySelector('#directory-input');
-        directory.value = 'D:/音乐';
-        directory.dispatchEvent(new Event('input', { bubbles: true }));
-        root.querySelector('[data-form="directory"]').dispatchEvent(
-            new Event('submit', { bubbles: true, cancelable: true }),
-        );
-        expect(JSON.parse(localStorage.getItem('shiyin.settings.v1')).directory).toBe('D:/音乐');
-        expect(root.querySelector('[role="dialog"]')).toBeNull();
-        expect(root.querySelector('main').inert).toBe(false);
-        click('[data-action="view"][data-id="downloads"]');
-        click('[data-action="toggle-all"]');
-        vi.advanceTimersByTime(600);
-        expect(tasks().filter((t) => t.status === 'downloading')).toHaveLength(2);
-        click('[data-action="toggle-all"]');
-        click('[data-action="view"][data-id="search"]');
-        click('[data-action="search-type"][data-id="albums"]');
-        expect(root.querySelectorAll('.collection-name').length).toBeGreaterThan(0);
-        click('.collection-name');
-        expect(root.querySelector('.collection-breadcrumb')).not.toBeNull();
+        click('[data-action="confirm-bulk"]');
+        await settle();
+        expect(tasks()).toHaveLength(1);
+        click('[data-action="close-modal"]');
+        expect(root.querySelector('#search-input')).toBe(field);
+        expect(field.value).toBe('新的草稿');
+        expect(field.selectionStart).toBe(1);
+        click('[data-action="search-type"][data-id="artists"]');
+        await search('周杰伦');
+        expect(root.querySelectorAll('.artist-row').length).toBe(1);
+        click('[data-action="artist"]');
+        await settle();
+        expect(root.querySelector('.artist-context').textContent).toContain('完整作品目录');
+        click('[data-action="artist-tab"][data-id="albums"]');
+        await settle();
+        click('[data-action="collection"]');
+        await settle();
+        expect(root.querySelector('.collection-breadcrumb').textContent).toContain('十一月的萧邦');
         click('[data-action="back"]');
-        click('[data-action="search-type"][data-id="playlists"]');
-        search('风');
-        expect(root.querySelectorAll('.collection-name').length).toBeGreaterThan(0);
-        click('[data-select-all]');
-        click('[data-action="download-selected"]');
-        expect(new Set(tasks().map((t) => t.track.id)).size).toBe(tasks().length);
-        click('[data-action="search-type"][data-id="tracks"]');
-        search('起风了');
-        click('[data-action="preview"]');
-        expect(root.querySelector('[role="status"]').textContent).toContain('没有可用的试听音源');
-        change('#source', '5sing');
-        expect(root.querySelector('.empty-results h2').textContent).toBe('没有找到相关结果');
+        await settle();
+        expect(root.querySelectorAll('.collection-row').length).toBeGreaterThan(0);
+        click('[data-action="back"]');
+        await settle();
+        change('#source', 'migu');
+        await settle();
+        click('[data-action="artist"]');
+        await settle();
+        expect(
+            root
+                .querySelector('[data-action="search-type"][data-id="tracks"]')
+                .getAttribute('aria-pressed'),
+        ).toBe('true');
+        expect(root.querySelector('.artist-context')).toBeNull();
+        expect(root.querySelector('[data-action="open-link"]')).toBeNull();
+        input('#search-input', 'https://www.kuwo.cn/playlist_detail/forest');
+        submit('search');
+        expect(root.querySelector('.link-result').textContent).toContain('1200');
+        click('[data-action="open-link-result"]');
+        await settle();
+        click('[data-action="download-all"]');
+        click('[data-action="confirm-bulk"]');
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(root.querySelector('.bulk-progress').textContent).toContain('1200 / 1200');
+        expect(root.querySelector('.bulk-progress').textContent).toMatch(/队列已满 [1-9]/);
+        click('[data-action="bulk-tasks"]');
+        expect(root.querySelectorAll('[data-task-row]').length).toBeLessThan(25);
+        click('[data-action="toggle-admission"]');
+        expect(root.querySelector('.task-filter').textContent).toContain('正在执行的任务会继续');
+        const batch = root.querySelector('#batch-filter option:nth-child(2)').value;
+        change('#batch-filter', batch);
+        click('[data-action="cancel-batch"]');
+        await vi.advanceTimersByTimeAsync(700);
+        click('[data-action="download-tab"][data-id="已取消"]');
+        expect(root.querySelectorAll('[data-task-row]').length).toBeGreaterThan(0);
+        click('[data-action="task-detail"]');
+        expect(root.querySelector('[role="dialog"]').textContent).toContain('下载目标');
+        click('[data-action="close-modal"]');
+        click('[data-action="settings"]');
+        change('[data-setting="quality"]', 'hires');
+        change('[data-setting="destination"]', 'archive');
+        expect(JSON.parse(localStorage.getItem('shiyin.settings.v1')).destination).toBe('archive');
+        expect(root.querySelector('[data-action="concurrency"]')).toBeNull();
+        input('#service-url', 'http://127.0.0.1:17632');
+        input('#service-token', 'test_only_token');
+        submit('service');
+        const persisted = Array.from({ length: localStorage.length }, (_, i) =>
+            localStorage.getItem(localStorage.key(i)),
+        ).join('');
+        expect(persisted).not.toContain('test_only_token');
     } finally {
         vi.clearAllTimers();
         vi.useRealTimers();

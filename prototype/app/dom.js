@@ -48,6 +48,8 @@ function patchChildren(parent, next) {
             if (current.nodeValue !== desired.nodeValue) current.nodeValue = desired.nodeValue;
         } else if (current.nodeType === 1) {
             for (const attribute of [...current.attributes]) {
+                // Let the native disclosure retain the user's open/closed choice.
+                if (current.localName === 'details' && attribute.name === 'open') continue;
                 if (!desired.hasAttribute(attribute.name)) current.removeAttribute(attribute.name);
             }
             for (const attribute of desired.attributes) {
@@ -56,7 +58,9 @@ function patchChildren(parent, next) {
             }
             patchChildren(current, desired);
             if (current instanceof HTMLInputElement) {
-                if (current.value !== desired.value) current.value = desired.value;
+                // Secret drafts are assigned via properties, never serialized in HTML attributes.
+                if (!current.hasAttribute('data-private') && current.value !== desired.value)
+                    current.value = desired.value;
                 current.checked = desired.checked;
             } else if (current instanceof HTMLSelectElement && current.value !== desired.value) {
                 current.value = desired.value;

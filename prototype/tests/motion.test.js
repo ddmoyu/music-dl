@@ -57,3 +57,60 @@ it('honors reduced motion and cancels an active transition when the preference c
         media.mockRestore();
     }
 });
+
+it('waits for the first page and does not replay on appended pages or recycled rows', () => {
+    const animate = vi.fn(() => ({ cancel: vi.fn(), finished: Promise.resolve() }));
+    const update = createMotion({ querySelector: () => ({ animate }) });
+    const state = { view: 'search', query: '', pager: { loading: false, items: [] } };
+    update(state);
+    state.query = '林间集';
+    state.pager.loading = true;
+    update(state);
+    update({ ...state, search: '继续输入' });
+    expect(animate).not.toHaveBeenCalled();
+    state.pager = { loading: false, items: [{ id: 'first' }] };
+    update(state);
+    expect(animate).toHaveBeenCalledTimes(1);
+    state.pager.loading = true;
+    update(state);
+    state.pager = { loading: false, items: [{ id: 'first' }, { id: 'next' }] };
+    update(state);
+    update({ ...state, viewport: { top: 2900, height: 400 } });
+    expect(animate).toHaveBeenCalledTimes(1);
+});
+
+it('discards a pending list transition when navigating away or reducing motion', () => {
+    let onChange;
+    const preference = {
+        matches: false,
+        addEventListener: (_, listener) => {
+            onChange = listener;
+        },
+    };
+    const media = vi.spyOn(window, 'matchMedia').mockReturnValue(preference);
+    const animation = { cancel: vi.fn(), finished: Promise.resolve() };
+    const animate = vi.fn(() => animation);
+    const root = { querySelector: vi.fn(() => ({ animate })) };
+    try {
+        const update = createMotion(root);
+        update({ view: 'search', query: '' });
+        update({ view: 'search', query: '旧请求', pager: { loading: true, items: [] } });
+        expect(animate).not.toHaveBeenCalled();
+        update({ view: 'settings' });
+        expect(root.querySelector).toHaveBeenLastCalledWith('.main-panel');
+        expect(animate).toHaveBeenCalledTimes(1);
+        const state = { view: 'search', query: '新请求', pager: { loading: true, items: [] } };
+        update(state);
+        expect(animation.cancel).toHaveBeenCalledTimes(1);
+        preference.matches = true;
+        onChange();
+        state.pager = { loading: false, items: [{ id: 'result' }] };
+        update(state);
+        preference.matches = false;
+        onChange();
+        update(state);
+        expect(animate).toHaveBeenCalledTimes(1);
+    } finally {
+        media.mockRestore();
+    }
+});

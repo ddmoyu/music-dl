@@ -122,7 +122,8 @@ export const collectionTracks = (collection) =>
 export const artwork = (cover) => `./images/${cover}.jpg`;
 export const qualityNames = {
     best: '最高可用音质',
-    lossless: '无损音质 · FLAC',
-    high: '高品质 · 320 kbps',
-    standard: '标准音质 · 128 kbps',
+    hires: 'Hi-Res 音质',
+    lossless: '无损音质',
+    high: '高品质',
+    standard: '标准音质',
 };

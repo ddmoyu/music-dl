@@ -1,5 +1,9 @@
 // Lucide 0.468.0 SVG paths; license: ../public/licenses/lucide.txt
 const icons = {
+    MoreHorizontal:
+        '<circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle>',
+    UserRound: '<circle cx="12" cy="8" r="5"></circle><path d="M20 21a8 8 0 0 0-16 0"></path>',
+    Link: '<path d="M10 13a5 5 0 0 0 7 .5l3-3a5 5 0 0 0-7-7l-2 2"></path><path d="M14 11a5 5 0 0 0-7-.5l-3 3a5 5 0 0 0 7 7l2-2"></path>',
     ArrowDownToLine:
         '<path d="M12 17V3"></path><path d="m6 11 6 6 6-6"></path><path d="M19 21H5"></path>',
     ArrowLeft: '<path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path>',
