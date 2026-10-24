@@ -4,37 +4,47 @@
   "version": "0.1.0",
   "defaultMode": "window",
   "port": 0,
-  "documentRoot": "/dist/prototype/",
+  "documentRoot": "/dist/app/",
   "url": "/",
   "enableServer": true,
   "enableNativeAPI": true,
   "tokenSecurity": "one-time",
   "nativeAllowList": [
     "app.exit",
-    "os.showFolderDialog",
     "os.open",
     "os.getPath",
+    "os.execCommand",
+    "os.spawnProcess",
+    "filesystem.getJoinedPath",
+    "filesystem.getStats",
+    "filesystem.createDirectory",
+    "filesystem.readFile",
+    "filesystem.readBinaryFile",
+    "filesystem.writeFile",
+    "filesystem.move",
+    "filesystem.remove",
+    "resources.extractFile",
     "storage.getData",
     "storage.setData"
   ],
   "modes": {
     "window": {
       "title": "拾音 · 音乐下载",
-      "width": 820,
+      "width": 600,
       "height": 820,
-      "minWidth": 720,
+      "minWidth": 560,
       "minHeight": 640,
       "center": true,
       "resizable": true,
       "injectGlobals": true,
       "enableInspector": false,
-      "exitProcessOnClose": true
+      "exitProcessOnClose": false
     }
   },
   "cli": {
     "binaryName": "shiyin",
-    "resourcesPath": "/dist/prototype/",
+    "resourcesPath": "/dist/app/",
     "distributionPath": "/release/",
-    "binaryVersion": "6.5.0"
+    "binaryVersion": "6.10.0"
   }
 }

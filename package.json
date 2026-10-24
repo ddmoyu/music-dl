@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Music download desktop interaction prototype with vanilla JavaScript, Vite and Neutralinojs",
+  "description": "Music download desktop application",
   "packageManager": "pnpm@12.14.0",
   "engines": {
     "node": ">=24"
@@ -16,9 +16,13 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm format:check && pnpm test && pnpm build",
-    "desktop:setup": "neu update",
-    "desktop:dev": "pnpm build && neu run",
-    "desktop:build": "pnpm build && neu build --release"
+    "desktop:setup": "node scripts/desktop-setup.js",
+    "desktop:dev": "pnpm desktop:prepare && pnpm build && neu run --disable-auto-reload",
+    "desktop:build": "pnpm desktop:prepare && pnpm build && node scripts/desktop-build.js package",
+    "prototype:dev": "vite --config vite.prototype.config.js --host 127.0.0.1",
+    "prototype:build": "vite build --config vite.prototype.config.js",
+    "desktop:prepare": "node scripts/desktop-build.js prepare",
+    "prototype:test": "vitest run --config vite.prototype.config.js"
   },
   "dependencies": {
     "@neutralinojs/lib": "6.10.0"
@@ -28,6 +32,6 @@
     "happy-dom": "^21.0.4",
     "prettier": "^3.9.10",
     "vite": "8.3.5",
-    "vitest": "^4.0.0"
+    "vitest": "^5.0.5"
   }
 }

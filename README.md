@@ -1,67 +1,71 @@
-# music-dl
+# 拾音
 
-面向 music-service 的音乐下载桌面工具。**当前仅保存可运行的交互原型，尚未开始正式前端实现；原型界面不代表最终产品效果。**
+基于 music-service 的实际桌面下载工具，使用原生 HTML/CSS/JavaScript、Vite 和 Neutralinojs。正式入口位于 `src/`，服务由桌面端自带并自动启动。
 
-原型使用原生 HTML、CSS、JavaScript ES Modules，配合 Vite 开发与打包，Neutralinojs 封装桌面窗口。项目统一使用 pnpm，不使用 Vue 或 React。
+## 开发和运行
 
-## 项目结构
+使用 Node.js 24、pnpm 12.14.0。先构建后端 `music_service_server`，确保 `MUSIC_SERVICE_PROVIDERS` 包含需要发布的平台；桌面生命周期要求后端支持 `--parent-pid`。
 
-```text
-music-dl/
-├── prototype/              # 独立的原型区域，不是正式前端 src
-│   ├── index.html          # Vite HTML 入口
-│   ├── app/                # 原型页面、交互、模拟队列
-│   ├── public/             # 图标、占位封面和素材来源
-│   └── tests/              # 队列、DOM、交互和动效测试
-├── docs/                   # 原型范围与后续实现边界
-├── .github/workflows/      # 安装、格式、测试和构建检查
-├── package.json
-├── pnpm-lock.yaml
-├── vite.config.js
-└── neutralino.config.json
-```
-
-根目录目前没有正式应用的 `src/`。今后启动正式前端开发时，需单独确认产品设计、应用架构与后端契约；不能直接将此原型当成已确定的最终界面。
-
-## 开发
-
-使用 Node.js 24 和 pnpm 12.14.0（版本固定在 `packageManager`）。在仓库根目录执行：
-
-```sh
+```powershell
 pnpm install
+pnpm desktop:setup
+# 指定自己构建的服务路径；此配置不写入仓库。
+$env:MUSIC_SERVICE_BINARY = '<后端安装目录>/bin/music-service.exe'
+pnpm desktop:prepare
 pnpm dev
 ```
 
-浏览器地址为 `http://127.0.0.1:5173/`。Vite 的根目录是 `prototype/`；构建输出到 `dist/prototype/`。
+浏览器开发地址为 `http://127.0.0.1:5175/`。Vite 的开发插件启动真实服务，数据按端口隔离存放于 `.tmp/development-service-<port>/`。开发端点仅接受同源请求，不把访问令牌存进浏览器持久存储。生产构建没有这个端点；普通静态预览不能启动本机服务。
 
-```sh
-pnpm test          # 原型测试
-pnpm build         # 构建原型静态资源
-pnpm preview       # 预览构建结果
-pnpm format        # 统一代码格式
-pnpm check         # 格式检查、测试和构建
+```powershell
+pnpm desktop:dev   # 构建正式页面并启动 Neutralino 窗口
+pnpm check         # 格式、正式应用测试和生产构建
 ```
 
-## 桌面原型
+桌面首次运行在系统应用数据目录的 `shiyin/` 初始化服务，默认下载到系统音乐目录下的 `拾音/`。三个监听端口均由系统分配，仅绑定 loopback。访问令牌使用服务创建的受限权限文件，前端只在内存持有。Cookie 交给服务的凭据存储处理，不写入前端偏好。
 
-```sh
-pnpm desktop:setup # 首次下载固定版本 Neutralinojs 运行时
-pnpm desktop:dev   # 构建并打开桌面窗口
-pnpm desktop:build # 生成便携包
+窗口关闭后，服务检测启动进程退出并执行正常停机；下次启动由服务恢复任务。不要同时打开多个使用同一数据目录的窗口。
+
+## Windows x64 打包
+
+先用后端的 `cmake --install <构建目录> --prefix <安装目录>` 生成服务与许可证文件，然后执行：
+
+```powershell
+$env:MUSIC_SERVICE_BINARY = '<后端安装目录>/bin/music-service.exe'
+$env:MUSIC_SERVICE_LICENSES = '<后端安装目录>/share/music-service/licenses'
+pnpm desktop:build
 ```
 
-Windows 程序位于 `release/shiyin/shiyin-win_x64.exe`，需保留同目录的 `resources.neu`；完整便携包位于 `release/shiyin-release.zip`。运行时、依赖、构建结果与用户存储不提交到 Git。
+也可事先将二进制放到 `bin/service/music-service.exe`，许可证放到 `bin/service/licenses/`，随后省略环境变量。服务正在运行时应先关闭对应桌面或开发进程，再替换二进制。
 
-默认窗口为 820 × 820，可调整大小，最小 720 × 640。Windows 使用 WebView2；macOS / Linux 的运行时也可由 Neutralino CLI 生成，但尚未在对应系统验证。
+先运行一次 `pnpm desktop:setup` 安装配置指定的 Neutralino 运行时；修改运行时版本后也需重新执行。
 
-## 原型范围
+产物为 `release/shiyin-windows-x64/shiyin-win_x64.exe` 和只包含此 EXE 的 `release/shiyin-windows-x64.zip`。EXE 内嵌正式页面、music-service 和第三方许可声明，可以单独复制运行。当前只验证 Windows x64，需要 WebView2 运行时。macOS/Linux 尚未打包验收。
 
-- 打开即搜索，支持单曲、歌单、专辑三种本地示例搜索与来源筛选。
-- 支持单首、整组、勾选批量加入队列，保留并行、暂停、继续、移除和失败重试交互。
-- 设置包括默认音质、1–8 并行、目录、去重、整理方式、元数据与歌词选项。
-- 原有轻量试听入口与克制动效均保留；没有发现、收藏或独立播放界面。
-- 浏览器使用 localStorage，桌面使用 Neutralino.storage；不提交实际用户的设置与历史。
+首次启动将服务释放到系统应用数据目录的 `shiyin/runtime/<SHA-256>/`，验证内容后才启动。再次启动校验并复用缓存，服务更新使用独立目录，不覆盖正在运行的旧版本。窗口关闭或桌面进程异常退出时，后端通过父进程监测正常停机。单文件指分发形式，运行时仍会保存服务缓存、配置、数据库和下载文件。
 
-**搜索数据和下载进度均为本地模拟，尚未接入 music-service，也不会写入音乐文件。** 当前示例歌曲没有试听音源。目录、元数据和歌词选项只保存配置，不执行文件处理。
+安装运行时与打包均在全新的 `.desktop-build/` 子目录工作，避免 Neutralino CLI 清理开发数据。打包启用 `--embed-resources`，并在确认输出仅含 EXE 后生成 ZIP；不额外分发 `resources.neu`、`bin/` 或 `licenses/`，重建时清理这些旧产物。**不要在仓库根目录直接运行 `neu build` 或 `neu update`**：它们会清理 `.tmp/`。不提交运行时、用户数据、凭据或构建结果。
 
-原型范围与后续接入说明见 [docs/prototype.md](docs/prototype.md)。素材来源见 [prototype/public/images/SOURCES.md](prototype/public/images/SOURCES.md)，Lucide 图标授权见 [prototype/public/licenses/lucide.txt](prototype/public/licenses/lucide.txt)。
+## 已接入功能
+
+- 真实歌曲、歌单、专辑和歌手搜索；从 `/providers` 读取能力，界面用平台缩写。
+- 按平台浏览排行榜、推荐歌单，进入详情后可返回原列表位置；仅提供搜索的歌手来源使用相关歌曲搜索。
+- 后端游标分页、滚动加载、固定行高虚拟列表。每列表最多缓存 5000 项，返回路径最多 8 层；部分来源失败保留成功结果并允许重试。
+- 真实分享链接解析和最多 30 秒试听，解析或版权/凭据错误如实显示。
+- 单首和已加载所选歌曲分批下载，每批最多 100 首；持久化幂等键和待确认请求，断连后确认原提交，避免重复创建。
+- 下载任务实时同步、右键菜单、多选、取消、重试和移除终态记录；移除记录仅隐藏本机列表，保留文件和后台历史。暂停新任务使用真实后台调度策略，不模拟单任务暂停。
+- 音质及降级策略、真实授权目标选择、Cookie 保存/验证/默认选择和删除。
+
+后台没有任务记录删除和单任务暂停接口，因此不提供伪操作。是否能下载取决于实时音源和账号授权；目录可搜索不代表拥有播放或下载权限。修改下载根目录和输出布局目前需关闭桌面端后编辑应用数据目录的 `service.json`，本轮未增加目录配置编辑器。
+
+## 原型隔离
+
+`prototype/` 仅保留设计参考，正式代码不导入它的演示目录、队列、计时器或示例链接。默认 `dev`、`build`、`test` 和桌面命令均面向正式应用。
+
+```sh
+pnpm prototype:dev
+pnpm prototype:build
+pnpm prototype:test
+```
+
+原型说明保留在 `docs/prototype.md`，其中能力描述不代表正式实现或实时平台授权。

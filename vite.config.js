@@ -1,14 +1,15 @@
 import { defineConfig } from 'vite';
+import { localServicePlugin } from './scripts/local-service.js';
 
 export default defineConfig({
-    root: 'prototype',
+    plugins: [localServicePlugin()],
     base: './',
     build: {
-        outDir: '../dist/prototype',
+        outDir: 'dist/app',
         emptyOutDir: true,
     },
     server: {
-        port: 5173,
+        port: 5175,
         strictPort: true,
     },
     test: {
