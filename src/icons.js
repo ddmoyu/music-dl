@@ -25,6 +25,7 @@ const icons = {
     Music2: '<circle cx="8" cy="18" r="4"></circle><path d="M12 18V2l7 4"></path>',
     Pause: '<rect x="14" y="4" width="4" height="16" rx="1"></rect><rect x="6" y="4" width="4" height="16" rx="1"></rect>',
     Play: '<polygon points="6 3 20 12 6 21 6 3"></polygon>',
+    Stop: '<rect x="6" y="6" width="12" height="12" rx="1"></rect>',
     Plus: '<path d="M5 12h14"></path><path d="M12 5v14"></path>',
     RotateCcw:
         '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path>',
@@ -45,6 +46,7 @@ export function icon(name, size = 15, className = '') {
             folder: 'Folder',
             download: 'Download',
             play: 'Play',
+            stop: 'Stop',
             close: 'X',
         }[name] || name;
     return (

@@ -1,46 +1,55 @@
-import { supports } from './api.js';
+import { supports, sourceLabel } from './api.js';
 export function searchPage(api, providers, type, source, query) {
     const sources = providers
         .filter((p) => supports(p, `search_${type}`) && (source === 'all' || p.source === source))
         .map((p) => p.source);
-    return async (cursor, signal) => {
+    return async (cursor, signal, progress = () => {}) => {
         const states = cursor
             ? JSON.parse(cursor)
             : Object.fromEntries(sources.map((source) => [source, null]));
-        const next = {},
+        // Unfinished sources keep their current position in every checkpoint.
+        const next = { ...states },
             items = [],
             errors = [];
-        // At most three upstream searches are submitted together.
         const entries = Object.entries(states);
-        for (let offset = 0; offset < entries.length; offset += 3) {
-            await Promise.all(
-                entries.slice(offset, offset + 3).map(async ([source, position]) => {
-                    try {
-                        const result = await api.request(`/search/${type}`, {
-                            query: { q: query, sources: source, limit: 30, cursor: position },
-                            signal,
-                        });
-                        const status = result.meta?.source_results?.find(
-                            (item) => item.source === source,
-                        );
-                        if (status && status.status !== 'ok')
-                            throw new Error(status.error?.message || '该来源暂不可用');
-                        items.push(...(result.data.items || []));
-                        const page = status?.page || result.data.page;
-                        if (page?.has_more && page.next_cursor) next[source] = page.next_cursor;
-                    } catch (error) {
-                        if (signal.aborted) throw error;
-                        next[source] = position;
-                        errors.push(`${source}: ${error.message}`);
-                    }
-                }),
-            );
-        }
-        return {
-            items,
+        const page = (batch) => ({
+            items: batch,
             nextCursor: Object.keys(next).length ? JSON.stringify(next) : null,
             error: errors.join('；'),
+        });
+        let index = 0;
+        // Match the service's default per-principal admission limit.
+        const worker = async () => {
+            while (index < entries.length) {
+                signal.throwIfAborted();
+                const [source, position] = entries[index++];
+                let batch = [];
+                try {
+                    const result = await api.request(`/search/${type}`, {
+                        query: { q: query, sources: source, limit: 30, cursor: position },
+                        signal,
+                    });
+                    signal.throwIfAborted();
+                    const status = result.meta?.source_results?.find(
+                        (item) => item.source === source,
+                    );
+                    if (status && status.status !== 'ok')
+                        throw new Error(status.error?.message || '该来源暂不可用');
+                    batch = result.data.items || [];
+                    items.push(...batch);
+                    const sourcePage = status?.page || result.data.page;
+                    if (sourcePage?.has_more && sourcePage.next_cursor)
+                        next[source] = sourcePage.next_cursor;
+                    else delete next[source];
+                } catch (error) {
+                    if (signal.aborted) throw error;
+                    errors.push(`${sourceLabel(source)}: ${error.message}`);
+                }
+                progress(page(batch));
+            }
         };
+        await Promise.all(Array.from({ length: Math.min(2, entries.length) }, worker));
+        return page(items);
     };
 }
 export function collectionPage(api, route, query) {

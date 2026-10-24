@@ -2,6 +2,7 @@ import {
     Api,
     supports,
     sourceLabel,
+    sortProviders,
     identity,
     terminal,
     downloadIntent,
@@ -47,6 +48,7 @@ const state = {
     paused: false,
     pending: null,
     playing: '',
+    playingId: '',
 };
 let api,
     session,
@@ -54,7 +56,6 @@ let api,
     toastTimer,
     frame,
     audio,
-    previewTimer,
     previewGeneration = 0,
     lastSelected = -1;
 const catalog = new Pager(render);
@@ -251,7 +252,8 @@ function listHTML(downloads) {
 }
 function rowHTML(item) {
     const id = identity(item),
-        track = trackList();
+        track = trackList(),
+        playing = state.playingId === id;
     const caption =
         artistNames(item) ||
         item.creator?.name ||
@@ -266,7 +268,7 @@ function rowHTML(item) {
             state.providers.find((p) => p.source === item.ref?.source),
             'resolve_audio',
         );
-    return `<article class="row ${state.selected.has(id) ? 'selected' : ''}" data-key="${esc(id)}"><input type="checkbox" aria-label="选择 ${esc(displayName(item))}" data-select="${esc(id)}" ${state.selected.has(id) ? 'checked' : ''} ${!track || disabled ? 'disabled' : ''}><div class="cover">${artwork ? `<img src="${esc(artwork)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : icon(track ? 'music' : 'folder', 20)}</div><div class="row-copy"><button class="title" data-open="${esc(id)}" ${track ? 'disabled' : ''}>${esc(displayName(item))}</button><p title="${esc(compactText(caption))}">${esc(compactText(caption || (track ? item.album?.title : '') || '—'))}</p></div>${state.source === 'all' && !state.detail ? `<span class="source-badge">${esc(sourceLabel(item.ref?.source))}</span>` : ''}${track ? `<div class="actions">${button(`preview:${id}`, icon('play', 16), disabled, `aria-label="试听 ${esc(displayName(item))}"`)}${button(`download:${id}`, icon('download', 16), disabled || state.busy || !!state.pending, `aria-label="下载 ${esc(displayName(item))}"`)}</div>` : button(`open:${id}`, '查看')}</article>`;
+    return `<article class="row ${state.selected.has(id) ? 'selected' : ''}" data-key="${esc(id)}"><input type="checkbox" aria-label="选择 ${esc(displayName(item))}" data-select="${esc(id)}" ${state.selected.has(id) ? 'checked' : ''} ${!track || disabled ? 'disabled' : ''}><div class="cover">${artwork ? `<img src="${esc(artwork)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : icon(track ? 'music' : 'folder', 20)}</div><div class="row-copy"><button class="title" data-open="${esc(id)}" ${track ? 'disabled' : ''}>${esc(displayName(item))}</button><p title="${esc(compactText(caption))}">${esc(compactText(caption || (track ? item.album?.title : '') || '—'))}</p></div>${state.source === 'all' && !state.detail ? `<span class="source-badge">${esc(sourceLabel(item.ref?.source))}</span>` : ''}${track ? `<div class="actions">${button(`preview:${id}`, icon(playing ? 'stop' : 'play', 16), disabled, `aria-label="${playing ? '停止试听' : '试听'} ${esc(displayName(item))}" title="${playing ? '停止试听' : '试听'}" aria-pressed="${playing}"`)}${button(`download:${id}`, icon('download', 16), disabled || state.busy || !!state.pending, `aria-label="下载 ${esc(displayName(item))}"`)}</div>` : button(`open:${id}`, '查看')}</article>`;
 }
 function taskHTML(task) {
     const progress = task.progress || {},
@@ -576,17 +578,25 @@ async function taskAction(action, ids) {
 }
 function stopPreview() {
     previewGeneration++;
-    clearTimeout(previewTimer);
     if (audio) {
+        audio.onended = null;
+        audio.onerror = null;
         audio.pause();
         audio.removeAttribute('src');
         audio.load();
         audio = null;
     }
     state.playing = '';
+    state.playingId = '';
 }
 async function preview(item) {
+    if (state.playingId === identity(item)) {
+        stopPreview();
+        render();
+        return;
+    }
     stopPreview();
+    render();
     const generation = previewGeneration;
     const { data: asset } = await api.request('/assets/resolve', {
         method: 'POST',
@@ -598,6 +608,7 @@ async function preview(item) {
             allow_preview: true,
         },
     });
+    if (generation !== previewGeneration) return;
     const { data: media } = await api.request('/media-access', {
         method: 'POST',
         body: {
@@ -617,12 +628,16 @@ async function preview(item) {
         stopPreview();
         announce('试听失败，音源暂不可用');
     };
-    await audio.play();
-    state.playing = displayName(item);
-    previewTimer = setTimeout(() => {
+    try {
+        await audio.play();
+    } catch (error) {
+        if (generation !== previewGeneration) return;
         stopPreview();
-        render();
-    }, 30000);
+        throw error;
+    }
+    if (generation !== previewGeneration) return;
+    state.playing = displayName(item);
+    state.playingId = identity(item);
     render();
 }
 async function credentials() {
@@ -796,6 +811,8 @@ root.addEventListener('click', (event) => {
         return;
     }
     const dispatch = [
+        'preview',
+        'stop-preview',
         'nav',
         'type',
         'filter',
@@ -853,7 +870,10 @@ root.addEventListener('click', (event) => {
         }
         if (action === 'preview')
             await preview(catalog.items.find((item) => identity(item) === value));
-        if (action === 'stop-preview') stopPreview();
+        if (action === 'stop-preview') {
+            stopPreview();
+            render();
+        }
         if (action === 'open-folder') await openDownloads(session.downloads);
         if (action === 'pause-queue') {
             const { data } = await api.request('/admin/download-policy', {
@@ -975,7 +995,7 @@ async function start() {
             api.request('/destinations'),
             api.request('/admin/download-policy'),
         ]);
-        state.providers = providers.data.items;
+        state.providers = sortProviders(providers.data.items);
         state.destinations = destinations.data.items;
         state.paused = policy.data.paused;
         if (

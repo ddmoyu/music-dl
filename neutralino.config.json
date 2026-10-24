@@ -9,6 +9,7 @@
   "enableServer": true,
   "enableNativeAPI": true,
   "tokenSecurity": "one-time",
+  "exportAuthInfo": false,
   "nativeAllowList": [
     "app.exit",
     "os.open",
@@ -30,12 +31,13 @@
   "modes": {
     "window": {
       "title": "拾音 · 音乐下载",
-      "width": 600,
+      "width": 540,
       "height": 820,
-      "minWidth": 560,
+      "minWidth": 500,
       "minHeight": 640,
       "center": true,
       "resizable": true,
+      "useSavedState": false,
       "injectGlobals": true,
       "enableInspector": false,
       "exitProcessOnClose": false

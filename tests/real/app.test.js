@@ -45,14 +45,17 @@ it('renders real API results safely, restores collection navigation and sends ac
     );
     const requests = [];
     const played = vi.fn(async () => {});
+    const paused = vi.fn();
+    let currentAudio;
     vi.stubGlobal(
         'Audio',
         class {
             constructor(url) {
                 this.src = url;
+                currentAudio = this;
             }
             play = played;
-            pause() {}
+            pause = paused;
             load() {}
             removeAttribute() {}
         },
@@ -138,9 +141,37 @@ it('renders real API results safely, restores collection navigation and sends ac
         expect(document.querySelector('footer').textContent).toContain('正在试听'),
     );
     expect(played).toHaveBeenCalledOnce();
+    let previewButton = document.querySelector('[data-action^="preview:"]');
+    expect(previewButton.getAttribute('aria-label')).toBe(`停止试听 ${track.title}`);
+    expect(previewButton.querySelector('svg rect')).not.toBeNull();
+    previewButton.click();
+    await vi.waitFor(() =>
+        expect(document.querySelector('[data-action="stop-preview"]')).toBeNull(),
+    );
+    expect(paused).toHaveBeenCalledOnce();
+    expect(played).toHaveBeenCalledOnce();
+    previewButton = document.querySelector('[data-action^="preview:"]');
+    expect(previewButton.getAttribute('aria-label')).toBe(`试听 ${track.title}`);
+    expect(previewButton.querySelector('svg polygon')).not.toBeNull();
+    previewButton.click();
+    await vi.waitFor(() => expect(currentAudio.onended).toBeTypeOf('function'));
+    currentAudio.onended();
+    await vi.waitFor(() =>
+        expect(
+            document.querySelector('[data-action^="preview:"]').getAttribute('aria-pressed'),
+        ).toBe('false'),
+    );
+    expect(document.querySelector('[data-action="stop-preview"]')).toBeNull();
+    document.querySelector('[data-action^="preview:"]').click();
+    await vi.waitFor(() =>
+        expect(document.querySelector('[data-action="stop-preview"]')).not.toBeNull(),
+    );
     document.querySelector('[data-action="stop-preview"]').click();
     await vi.waitFor(() =>
         expect(document.querySelector('[data-action="stop-preview"]')).toBeNull(),
+    );
+    expect(document.querySelector('[data-action^="preview:"]').getAttribute('aria-pressed')).toBe(
+        'false',
     );
     const download = document.querySelector('[data-action^="download:"]');
     expect(download.dataset.action).toContain(track.ref.id);

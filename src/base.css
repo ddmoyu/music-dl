@@ -555,7 +555,7 @@ footer button {
         gap: 7px;
     }
     nav {
-        gap: 0;
+        gap: 6px;
     }
     nav button {
         padding-inline: 7px;

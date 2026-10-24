@@ -53,6 +53,16 @@ export const sourceLabel = (source) =>
         jamendo: 'jm',
         bilibili: 'bl',
     })[source] || source;
+// Leading music services: MoonFox 2025 MAU (https://www.moonfox.cn/insight/news/2003).
+// Remaining sources use a fixed product order, not a measured market ranking.
+const sourceOrder = ['qq', 'kg', 'wyy', 'kw', 'mg', 'bl', 'qqyy', '5s', 'jx', 'jm'];
+export function sortProviders(providers) {
+    const rank = (provider) => {
+        const index = sourceOrder.indexOf(sourceLabel(provider.source));
+        return index < 0 ? sourceOrder.length : index;
+    };
+    return [...providers].sort((a, b) => rank(a) - rank(b));
+}
 export const compactText = (value) =>
     String(value ?? '').replace(
         /QQ音乐|QQ 音乐|酷我音乐|酷我|网易云音乐|网易云|酷狗音乐|酷狗|咪咕音乐|咪咕|千千音乐|千千/g,
