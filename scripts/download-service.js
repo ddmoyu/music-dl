@@ -68,7 +68,7 @@ if (roots.length !== 1) throw new Error('后端包必须只有一个根目录');
 const source = path.join(extracted, roots[0]);
 const bundle = path.resolve('bin/service', SERVICE_VERSION, 'bundle');
 await mkdir(path.dirname(bundle), { recursive: true });
-await cp(source, bundle, { recursive: true });
+await cp(source, bundle, { recursive: true, verbatimSymlinks: true });
 const binary = path.join(
     bundle,
     'bin',

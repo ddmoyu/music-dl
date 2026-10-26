@@ -14,7 +14,10 @@ if (
     path.resolve(process.env.MUSIC_SERVICE_BUNDLE) !== installed
 ) {
     await mkdir(path.dirname(installed), { recursive: true });
-    await cp(process.env.MUSIC_SERVICE_BUNDLE, installed, { recursive: true });
+    await cp(process.env.MUSIC_SERVICE_BUNDLE, installed, {
+        recursive: true,
+        verbatimSymlinks: true,
+    });
 }
 const service = path.join(installed, 'bin/music-service');
 if (
@@ -35,14 +38,17 @@ if (mode === 'package') {
     const contents =
         target.platform === 'darwin' ? path.join(stage, 'bundle/曲袋.app/Contents') : null;
     const appRoot = contents
-        ? path.join(contents, 'MacOS')
+        ? path.join(contents, 'Resources')
         : path.join(stage, 'bundle', `qudai-${target.id}`);
     await mkdir(appRoot, { recursive: true });
     const serviceRoot = path.join(appRoot, 'service');
     for (const directory of ['bin', 'lib', 'share/music-service/licenses']) {
         const source = path.join(installed, directory);
         if (await stat(source).catch(() => null))
-            await cp(source, path.join(serviceRoot, directory), { recursive: true });
+            await cp(source, path.join(serviceRoot, directory), {
+                recursive: true,
+                verbatimSymlinks: true,
+            });
     }
     const files = [];
     async function record(directory, prefix = '') {
@@ -85,6 +91,17 @@ if (mode === 'package') {
     const asset = path.resolve('release', target.assets[0]);
     if (contents) {
         await mkdir(path.join(contents, 'Resources'), { recursive: true });
+        await mkdir(path.join(contents, 'MacOS'), { recursive: true });
+        execFileSync('clang', [
+            '-Os',
+            '-mmacosx-version-min=15.0',
+            'scripts/macos-launcher.c',
+            '-o',
+            path.join(contents, 'MacOS/qudai-launcher'),
+        ]);
+        execFileSync('codesign', ['--force', '--sign', '-', '--timestamp=none', executable], {
+            stdio: 'inherit',
+        });
         const cliRequire = createRequire(cli);
         const icons = cliRequire('png2icons');
         const icon = icons.createICNS(await readFile('dist/app/app-icon.png'), icons.HERMITE, 0);
@@ -95,7 +112,7 @@ if (mode === 'package') {
             `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleExecutable</key><string>qudai</string>
+<key>CFBundleExecutable</key><string>qudai-launcher</string>
 <key>CFBundleIdentifier</key><string>${config.applicationId}</string>
 <key>CFBundleName</key><string>曲袋</string>
 <key>CFBundleDisplayName</key><string>曲袋</string>

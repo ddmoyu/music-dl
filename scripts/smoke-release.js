@@ -22,12 +22,13 @@ const directory = path.resolve(
 );
 await mkdir(directory, { recursive: true });
 const archiveAsset = packaged.assets.find((asset) => !asset.endsWith('.exe'));
-execFileSync('tar', ['-xf', archiveAsset, '-C', directory], { windowsHide: true });
+if (target.platform === 'win32') await require('zip-lib').extract(archiveAsset, directory);
+else execFileSync('tar', ['-xf', archiveAsset, '-C', directory]);
 const appRoot =
     target.platform === 'win32'
         ? directory
         : target.platform === 'darwin'
-          ? path.join(directory, '曲袋.app/Contents/MacOS')
+          ? path.join(directory, '曲袋.app/Contents/Resources')
           : path.join(directory, `qudai-${target.id}`);
 const desktop = path.join(appRoot, target.platform === 'win32' ? 'qudai-win_x64.exe' : 'qudai');
 let archive = path.join(appRoot, 'resources.neu');
@@ -134,5 +135,11 @@ try {
 }
 await writeFile(
     '.desktop-build/smoke-package.json',
-    JSON.stringify({ target: target.id, executable: desktop }),
+    JSON.stringify({
+        target: target.id,
+        executable:
+            target.platform === 'darwin'
+                ? path.join(directory, '曲袋.app/Contents/MacOS/qudai-launcher')
+                : desktop,
+    }),
 );
