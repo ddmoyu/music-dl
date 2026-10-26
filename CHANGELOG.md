@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 0.1.3 - 2026-10-26
+## 0.1.3 - 2026-10-27
 
 - 新增 Linux x64/ARM64、macOS Intel/Apple Silicon 桌面预览包，Windows 继续提供单 EXE 和 ZIP。
 - 桌面包固定使用 music-service v0.1.30 的已发布平台包，核对源码提交、文件大小与 SHA256；macOS 保留后端所需运行库布局。

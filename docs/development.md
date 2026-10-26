@@ -53,6 +53,8 @@ pnpm desktop:build
 
 Windows 保持 `--embed-resources` 单文件。Linux/macOS 使用独立的 `resources.neu` 与随包服务，macOS 保留后端 LLVM 运行库的原始相对布局，并为完整 `.app` 做 ad-hoc 签名；没有 Developer ID 签名或公证。macOS 最低 15；Linux 以 Ubuntu 24.04 为基线，需安装 WebKitGTK 4.1 和 GTK 3；Windows 需有 WebView2。
 
+macOS 的原生入口仅定位并 `exec` 应用 Resources 目录内的 Neutralino，保持同一进程 ID；页面、服务、运行库和许可证均位于 Resources，避免资源文件被当作 MacOS 目录中的嵌套代码签名。复制后端时保留相对符号链接，不写入 CI 机器的绝对路径。
+
 产物写入 `release/`，不能提交二进制、构建结果、运行数据或本机绝对路径。Logo 唯一矢量源为 `public/favicon.svg`，构建时生成 PNG，macOS 图标从同一 PNG 生成 ICNS。
 
 ## GitHub Actions 发布
