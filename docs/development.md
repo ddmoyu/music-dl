@@ -1,71 +1,75 @@
 # 开发、打包与运行细节
 
-面向开发者的完整说明。项目概览和界面截图见 [README](../README.md)。
-
-## 技术栈与目录
-
-正式前端使用原生 HTML、CSS、JavaScript ES Modules、Vite 与 Neutralinojs，不引入 UI 框架。品牌图标的唯一矢量源为 `public/favicon.svg`，构建时生成窗口与 EXE 使用的 PNG。
-
-```text
-src/          正式应用
-public/       正式静态资源与品牌图标
-scripts/      本机服务、桌面构建与品牌资源脚本
-tests/        正式应用测试
-docs/         开发说明与真实界面截图
-prototype/    独立设计原型
-```
+项目概览、系统要求和下载入口见 [README](../README.md)。正式应用采用原生 HTML、CSS、JavaScript ES Modules、Vite 与 Neutralinojs；`prototype/` 是独立设计参考，不进入正式包。
 
 ## 开发和运行
 
-使用 Node.js 24、pnpm 12.14.0。当前前端对应 music-service 0.1.30（schema 8）。先构建后端 `music_service_server`，确保 `MUSIC_SERVICE_PROVIDERS` 包含需要发布的平台；桌面生命周期要求后端支持 `--parent-pid`。
+使用 Node.js 24、pnpm 12.14.0、Neutralino 6.10.0 和 music-service 0.1.30（schema 8）。包管理器以 `package.json` 的 `packageManager` 为准，只维护 `pnpm-lock.yaml`。
 
 ```powershell
 pnpm install
+pnpm service:download
 pnpm desktop:setup
-# 指定自己构建的服务路径；此配置不写入仓库。
-$env:MUSIC_SERVICE_BINARY = '<后端安装目录>/bin/music-service.exe'
-pnpm desktop:prepare
-pnpm dev
+pnpm desktop:dev
 ```
 
-浏览器开发地址为 `http://127.0.0.1:5175/`。Vite 的开发插件启动真实服务，数据按端口隔离存放于 `.tmp/development-service-<port>/`。开发端点仅接受同源请求，不把访问令牌存进浏览器持久存储。生产构建没有这个端点；普通静态预览不能启动本机服务。
+`service:download` 需要 GitHub CLI，下载当前系统/架构对应的已发布后端包，核对固定版本、源码提交、报告与资产 SHA256 后运行 `version`。下载结果位于 `bin/service/0.1.30/bundle/`。CI 使用自己的只读 GitHub token；不要把个人凭据写入仓库。
+
+也可以自行构建后端：Windows 设置 `MUSIC_SERVICE_BINARY` 和 `MUSIC_SERVICE_LICENSES`；Linux/macOS 设置 `MUSIC_SERVICE_BUNDLE` 为完整安装目录，保留 `bin/`、`lib/` 和 `share/music-service/licenses/` 的相对布局。后端应包含所需 `MUSIC_SERVICE_PROVIDERS` 并支持 `--parent-pid`。
+
+`pnpm dev` 在 <http://127.0.0.1:5175/> 启动正式前端，Vite 会启动真实开发服务。开发数据位于 `.tmp/development-service-<port>/`，与桌面用户数据隔离。开发端点仅接受同源请求，生产构建没有此端点；普通静态预览不能启动本机服务。
+
+## 本机数据与兼容性
+
+桌面服务配置、数据库与凭据位于系统应用数据目录下的 `shiyin/`，新配置默认下载至系统音乐目录下的 `曲袋/`，已有配置保留原下载目录。保留既有应用 ID 和偏好键以兼容 Windows 已有账号与任务。三个服务监听端口由系统分配，只绑定 loopback；访问令牌仅在前端内存持有，Cookie 由后端凭据存储管理。
+
+schema 8 不自动迁移更早开发版本数据库。升级旧开发版本前，先关闭程序并备份配置、数据库、秘密和下载文件。旧格式不能直接使用时，应改用新的服务数据目录初始化；清理旧 `shiyin/service/` 和旧前端偏好会删除账号、Cookie 与任务记录，下载目录中的音乐文件独立保存。不要同时启动多个使用同一数据目录的桌面窗口。
+
+已有 `service.json` 在启动时保持原样，当前端口、来源与数据目录写入 `launcher-config.json`。配置、偏好或待确认下载记录损坏时明确报错并保留原文件，不静默重置；修复文件或权限后重新连接。设置和隐藏记录在保存成功后生效。
+
+Windows 单 EXE 先校验并释放内嵌服务，缓存位于 `shiyin/runtime/<SHA-256>/`，更新不覆盖正在运行的旧服务。Linux/macOS 从应用包内的 `service/` 启动，逐文件核对后端和运行库的大小与 SHA256，不向签名的应用目录写入用户数据。后端通过父进程监测在桌面退出后停机，下次启动恢复任务。
+
+Linux/macOS 的 Neutralino 偏好和日志采用系统用户数据位置；Windows 延续已有偏好存储兼容逻辑。账号校验的短暂失败最多自动重试 5 次，间隔递增且不超过 30 秒，持续失败可手动重试；服务启动超时会清理本次启动的子进程，清理失败明确提示。
+
+## 跨平台打包
 
 ```powershell
-pnpm desktop:dev   # 构建正式页面并启动 Neutralino 窗口
-pnpm check         # 格式、正式应用测试和生产构建
-```
-
-桌面首次运行在系统应用数据目录的 `shiyin/` 初始化服务，新配置默认下载到系统音乐目录下的 `曲袋/`；已有配置继续使用原下载目录。改名保留原应用 ID、数据目录及偏好存储键，以继续读取已有账号与任务。三个监听端口均由系统分配，仅绑定 loopback。访问令牌使用服务创建的受限权限文件，前端只在内存持有。Cookie 交给服务的凭据存储处理，不写入前端偏好。
-
-开发阶段只使用当前数据结构，不迁移旧数据库，也不回退旧接口。升级旧开发版本前，关闭程序并清理 `shiyin/service/` 下的旧服务数据及旧前端偏好，再由当前服务初始化；这会清除旧账号、Cookie 和任务记录。开发服务的数据目录为 `.tmp/development-service-<port>/service/`。下载目录中的音乐文件独立保存，不属于数据库清理范围。
-
-窗口关闭后，服务检测启动进程退出并执行正常停机；下次启动由服务恢复任务。不要同时打开多个使用同一数据目录的窗口。
-
-已有 `service.json` 在启动时保持原样，当前监听端口、页面来源和数据目录写入同目录的 `launcher-config.json` 供服务使用。原配置、偏好或待确认下载记录损坏、无法读取时会明确报错并保留原文件，不静默恢复默认值；修复文件或存储权限后重新连接。设置和列表隐藏操作在保存成功后才生效。
-
-账号校验请求短暂失败后最多自动重试 5 次，间隔逐步增加且不超过 30 秒；仍失败时保留错误，可手动刷新重试。服务启动超时会尝试结束本次启动的子进程，清理失败时提示关闭窗口后重试。
-
-## Windows x64 打包
-
-先用后端的 `cmake --install <构建目录> --prefix <安装目录>` 生成服务与许可证文件，然后执行：
-
-```powershell
-$env:MUSIC_SERVICE_BINARY = '<后端安装目录>/bin/music-service.exe'
-$env:MUSIC_SERVICE_LICENSES = '<后端安装目录>/share/music-service/licenses'
+pnpm service:download
+pnpm desktop:setup
 pnpm desktop:build
 ```
 
-也可事先将二进制放到 `bin/service/0.1.30/music-service.exe`，许可证放到 `bin/service/licenses/`，随后省略环境变量。打包会校验服务版本，拒绝混入旧接口二进制。服务正在运行时应先关闭对应桌面或开发进程，再替换二进制。
+`scripts/desktop-targets.js` 定义五个目标及其原生 runner：
 
-先运行一次 `pnpm desktop:setup` 安装配置指定的 Neutralino 运行时；修改运行时版本后也需重新执行。
+| 目标                | runner           | 分发形式                                          |
+| ------------------- | ---------------- | ------------------------------------------------- |
+| Windows x64         | windows-2025     | 单 EXE、只含同一 EXE 的 ZIP                       |
+| Linux x64           | ubuntu-24.04     | 带桌面运行时、resources.neu 和 service/ 的 tar.gz |
+| Linux ARM64         | ubuntu-24.04-arm | 同上，使用 ARM64 二进制                           |
+| macOS Intel         | macos-15-intel   | 带图标、Info.plist、服务与运行库的 .app ZIP       |
+| macOS Apple Silicon | macos-15         | 同上，使用 ARM64 二进制                           |
 
-产物为 `release/qudai-windows-x64/qudai-win_x64.exe` 和只包含此 EXE 的 `release/qudai-windows-x64.zip`。EXE 内嵌正式页面、music-service 和第三方许可声明，可以单独复制运行。Windows 文件描述为「曲袋 · 音乐下载」，产品名为「曲袋」，进程文件名为 `qudai-win_x64.exe`，均使用自有图标。当前只验证 Windows x64，需要 WebView2 运行时。macOS/Linux 尚未打包验收。
+打包在独立 `.desktop-build/` 目录完成，只复制正式构建、匹配目标的 Neutralino 二进制、经过校验的服务和第三方许可。**不要在仓库根目录直接运行 `neu build` 或 `neu update`**，它们会归档并清理 `.tmp/`。
 
-`desktop:dev` 同样复制并写入名称与图标后启动，避免开发窗口仍显示通用 Neutralino 进程；原下载的运行时不会被修改。旧版本正在运行时，名称与图标不会实时更新，需要关闭旧窗口并启动新版 EXE。
+Windows 保持 `--embed-resources` 单文件。Linux/macOS 使用独立的 `resources.neu` 与随包服务，macOS 保留后端 LLVM 运行库的原始相对布局，并为完整 `.app` 做 ad-hoc 签名；没有 Developer ID 签名或公证。macOS 最低 15；Linux 以 Ubuntu 24.04 为基线，需安装 WebKitGTK 4.1 和 GTK 3；Windows 需有 WebView2。
 
-首次启动将服务释放到系统应用数据目录的 `shiyin/runtime/<SHA-256>/`，验证内容后才启动。再次启动校验并复用缓存，服务更新使用独立目录，不覆盖正在运行的旧版本。窗口关闭或桌面进程异常退出时，后端通过父进程监测正常停机。单文件指分发形式，运行时仍会保存服务缓存、配置、数据库和下载文件。
+产物写入 `release/`，不能提交二进制、构建结果、运行数据或本机绝对路径。Logo 唯一矢量源为 `public/favicon.svg`，构建时生成 PNG，macOS 图标从同一 PNG 生成 ICNS。
 
-安装运行时与打包均在全新的 `.desktop-build/` 子目录工作，避免 Neutralino CLI 清理开发数据。打包启用 `--embed-resources`，并在确认输出仅含 EXE 后生成 ZIP；不额外分发 `resources.neu`、`bin/` 或 `licenses/`，重建时清理这些旧产物。**不要在仓库根目录直接运行 `neu build` 或 `neu update`**：它们会清理 `.tmp/`。不提交运行时、用户数据、凭据或构建结果。
+## GitHub Actions 发布
+
+应用版本以 `package.json` 为准，`pnpm version:sync` 同步 Neutralino 配置。`package.json` 的 `release.prerelease` 决定是否发布预览版。更新日志先累积到 `Unreleased`，发布时整理为 `## X.Y.Z - YYYY-MM-DD`。
+
+后端来源固定在 `scripts/release-service.json`：Release tag、完整源码 SHA、报告 SHA256 和五个平台资产 SHA256。升级后端需核对已发布文件，并同步此清单与 `src/service-version.js`；不使用漂移的 latest 链接或现场构建的未验证二进制。
+
+`release.yml` 在推送 `vX.Y.Z` tag 时运行：校验版本与日志，在五个原生 runner 分别检查格式、测试、构建和打包；解压最终下载包到含中文与空格的路径，核对架构、执行权限、资源、许可及运行库，并启动真实服务检查平台注册和鉴权。随后启动包内的真实桌面 WebView，确认前端启动服务，并在桌面退出后检查服务停机。Linux 使用 Xvfb 提供显示环境。
+
+原生桌面检查仅允许在隔离的 CI 账号运行，避免读取本机已有用户数据。CI 启动检查不代表所有真实机器、Linux 发行版、macOS Gatekeeper 安装交互或在线音源都已逐一验收，不自动下载歌曲。
+
+每个平台生成独立资产报告，汇总 job 必须收到五个平台的全部资产，重新核对 tag、前端提交、后端固定提交、大小与 SHA256 后，才会先创建草稿、上传完整文件并公开 Release。预览版不取代现有稳定版。已存在的 Release 不会覆盖，不移动已公开 tag。
+
+每版提供六个桌面下载文件、`SHA256SUMS` 和 `release-manifest.json`。Release 正文由本版日志生成，末尾附按 Windows/Linux/macOS 分组的下载表，所有下载链接固定到对应 tag 和文件名。下载计数是资产下载次数，不是安装人数。
+
+手动运行工作流并传入候选 tag 只执行验证与资产汇总，不创建 tag 或 Release。正式发布需明确授权；通过预检并提交相关变化后，推送本次单个 tag。发布结束还需从正式 Release 下载文件，与同次 CI 报告核对，不能使用另一次本地构建的哈希替代。
 
 ## 已接入功能
 
@@ -85,49 +89,6 @@ pnpm desktop:build
 
 换源匹配、平台下载成功率排序及额度均由后台处理，不在前端搜索或猜测候选。歌曲名、完整歌手名单及版本须严格匹配，双方时长已知时差值不超过 2 秒；源耗尽明确显示失败，不放宽条件。试听保留标准品质、允许同源降级及 `allow_preview=true` 的既有策略，下载保持用户音质策略及 `allow_preview=false`。schema 8 不自动迁移旧服务数据库，前端也不会清理或覆盖旧数据。
 
-## GitHub Actions 发布
-
-应用版本以 `package.json` 为准，修改后运行 `pnpm version:sync` 同步 Neutralino 元数据。`CHANGELOG.md` 为每次发布保留 `## X.Y.Z - YYYY-MM-DD` 条目；开发中的变化先写入 `Unreleased`。
-
-`.github/workflows/release.yml` 在推送 `vX.Y.Z` tag 时执行，校验 tag 格式、前端与桌面版本、对应更新日志后，在 Windows x64 runner 上构建固定提交的 music-service。后端的仓库、完整 SHA、版本和平台列表保存在 `scripts/release-service.json`；升级后端时需同时更新此文件和 `src/service-version.js`。
-
-工作流使用 MSVC Release 和后端既有的静态 CRT 配置，运行后端 CTest、前端 `pnpm check`，再通过独立 `.desktop-build/` 工作目录生成单文件桌面包。发布前检查 PE 架构、Windows 产品与文件版本、系统 DLL 依赖、ZIP 只有一个 EXE，并从最终 EXE 中提取资源、校验内嵌后端和许可证，启动真实服务检查平台注册与鉴权。该检查不依赖线上歌曲，也不证明所有平台的实时下载成功率。
-
-构建 job 只有仓库读取权限；单独的发布 job 在取得已验证资产并重新核对 SHA256、tag、提交和发布说明后，先创建草稿并上传所有文件，再公开 Release。已存在的 Release 不会被覆盖，失败时先定位原因，不移动已发布 tag。
-
-后端 CTest 保留全部用例；针对共享 CI 中短时间网络缓冲与调度波动，失败用例最多重跑一次，两次均失败时阻止发布。测试输出会保留首次失败记录，不能把跳过用例或允许失败作为发布成功。
-
-发布资产包含：
-
-- `qudai-win_x64.exe`：可独立运行的 Windows x64 EXE。
-- `qudai-windows-x64.zip`：只含同一 EXE 的 ZIP。
-- `SHA256SUMS`：上述两个下载包的 SHA256。
-- `release-manifest.json`：同一次构建的前端提交、后端固定提交、文件大小与 SHA256。
-
-Release 说明从该版本的更新日志生成，末尾附按系统排列的下载表，链接固定到本次 tag 和实际文件名。下载计数徽章统计所有 Release 资产的下载次数，不代表安装人数。
-
-发布操作需明确授权；准备完版本、更新日志和必要检查后：
-
-```powershell
-pnpm version:sync
-pnpm check
-# 提交并推送本次发布相关改动后，确认 tag 未被使用，再推送单个 tag。
-git tag vX.Y.Z
-git push origin vX.Y.Z
-```
-
-tag 推送成功后需等待 Actions 完成，回读实际 Release、资产和下载表，并将下载文件与同次 CI 的 `release-manifest.json` 对照。不能用另一次本地构建的哈希代替 CI 报告。
-
-首次接入或修改发布流水线时，可先手动运行该工作流并传入候选 tag（例如 `v0.1.2`），只完成构建验证，不创建 tag 或 Release。验证通过后再推送正式 tag；正式发布仍会在该 tag 对应的提交上重新构建并校验。
-
 ## 原型隔离
 
-`prototype/` 仅保留设计参考，正式代码不导入它的演示目录、队列、计时器或示例链接。默认 `dev`、`build`、`test` 和桌面命令均面向正式应用。
-
-```sh
-pnpm prototype:dev
-pnpm prototype:build
-pnpm prototype:test
-```
-
-原型说明保留在 `docs/prototype.md`，其中能力描述不代表正式实现或实时平台授权。
+`prototype/` 仅供设计参考，通过 `pnpm prototype:dev`、`pnpm prototype:build` 和 `pnpm prototype:test` 独立运行。详见 [原型说明](prototype.md)。

@@ -4,12 +4,10 @@ import { resolveServiceBinary } from './service-binary.js';
 import { SERVICE_DATA_DIRECTORY } from './service-version.js';
 import { ensureDirectory, readOptionalFile } from './native-files.js';
 import { launchService } from './service-launch.js';
+import { commandArgument } from './command-argument.js';
 
 export const native = typeof window !== 'undefined' && 'NL_OS' in window;
-const quote = (value) => {
-    if (/["\r\n%`$]/.test(value)) throw new Error('应用路径包含不支持的字符');
-    return `"${value}"`;
-};
+const quote = (value) => commandArgument(value, window.NL_OS);
 export async function bootService() {
     if (!native) {
         const response = await fetch('/__desktop/session', {

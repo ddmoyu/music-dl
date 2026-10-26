@@ -39,7 +39,7 @@ it('publishes only the requested dated changelog entry, not Unreleased or older 
     expect(() => changelogEntry('## 0.1.2 - 2026-10-26\n\n', '0.1.2')).toThrow();
 });
 
-it('ends release notes with tag-specific download links for the actual Windows assets', () => {
+it('ends release notes with tag-specific downloads for the complete platform set', () => {
     const notes = releaseNotes({
         tag: 'v0.1.2',
         repository: 'ddmoyu/music-dl',
@@ -48,8 +48,9 @@ it('ends release notes with tag-specific download links for the actual Windows a
     expect(notes).toContain('/releases/download/v0.1.2/qudai-win_x64.exe');
     expect(notes).toContain('/releases/download/v0.1.2/qudai-windows-x64.zip');
     expect(notes).not.toContain('latest/download');
-    expect(notes).not.toContain('ARM64');
-    expect(notes.trim().split('\n').at(-1)).toMatch(/^\| Windows \|.*\|$/);
+    for (const name of releaseFiles) expect(notes).toContain(`/releases/download/v0.1.2/${name}`);
+    expect(notes).toContain('ARM64');
+    expect(notes.trim().split('\n').at(-1)).toMatch(/^\| macOS \|.*\|$/);
 });
 
 async function fixture() {

@@ -115,7 +115,11 @@ export function localServicePlugin() {
                         worker.send({
                             binary:
                                 process.env.MUSIC_SERVICE_BINARY ||
-                                path.resolve(`bin/service/${SERVICE_VERSION}/music-service.exe`),
+                                path.resolve(
+                                    process.platform === 'win32'
+                                        ? `bin/service/${SERVICE_VERSION}/music-service.exe`
+                                        : `bin/service/${SERVICE_VERSION}/bundle/bin/music-service`,
+                                ),
                             directory: path.resolve(
                                 `.tmp/development-service-${server.httpServer.address().port}`,
                             ),

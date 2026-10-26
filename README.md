@@ -5,6 +5,7 @@
 # 曲袋
 
 [![最新版本](https://img.shields.io/github/v/release/ddmoyu/music-dl?style=flat-square)](https://github.com/ddmoyu/music-dl/releases/latest)
+[![跨平台预览版](https://img.shields.io/badge/preview-v0.1.3-2d7d9a?style=flat-square)](https://github.com/ddmoyu/music-dl/releases/tag/v0.1.3)
 [![下载次数](https://img.shields.io/github/downloads/ddmoyu/music-dl/total?style=flat-square)](https://github.com/ddmoyu/music-dl/releases)
 
 把喜欢的歌曲装进口袋。
@@ -21,15 +22,21 @@
 
 ## 获取与运行
 
-目前已验证 **Windows x64**，系统需有 **WebView2 运行时**。macOS、Linux 及其他架构尚未打包验收。
+跨平台预览版提供 Windows x64、Linux x64/ARM64、macOS Intel/Apple Silicon。请选择对应系统和处理器的包，保留解压后的完整布局。
 
-前往 [Releases](https://github.com/ddmoyu/music-dl/releases/latest) 下载：
+前往 [v0.1.3 跨平台预览版](https://github.com/ddmoyu/music-dl/releases/tag/v0.1.3) 下载；[Windows 稳定版](https://github.com/ddmoyu/music-dl/releases/latest)继续保留。
 
-| 系统    | 下载                                                                                                                                                                                                                                                                                                                         |
-| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Windows | [![EXE x64](https://img.shields.io/badge/EXE-x64-2d7d9a?style=flat-square)](https://github.com/ddmoyu/music-dl/releases/download/v0.1.2/qudai-win_x64.exe)<br>[![ZIP x64](https://img.shields.io/badge/ZIP-x64-67b7d1?style=flat-square)](https://github.com/ddmoyu/music-dl/releases/download/v0.1.2/qudai-windows-x64.zip) |
+| 系统    | 下载                                                                                                                                                                                                    |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows | [EXE x64](https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-win_x64.exe) · [ZIP x64](https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-windows-x64.zip)                 |
+| Linux   | [tar.gz x64](https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-linux-x64.tar.gz) · [tar.gz ARM64](https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-linux-arm64.tar.gz) |
+| macOS   | [APP Intel](https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-macos-x64.zip) · [APP Apple Silicon](https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-macos-arm64.zip)   |
 
-EXE 可直接运行；ZIP 解压后包含同一个 EXE。无需另外安装 Node.js 或后端服务。首次运行会释放服务并创建本机配置与数据，便携包并不表示所有数据都保存在 EXE 旁。
+- **Windows**：需要 WebView2 运行时。EXE 可直接运行；ZIP 解压后包含同一个 EXE。
+- **Linux**：以 Ubuntu 24.04 为基线，需要 GTK 3 与 WebKitGTK 4.1（`libwebkit2gtk-4.1-0`）。解压后运行 `start.sh`，不要单独移动 `qudai` 或 `service/`。
+- **macOS**：最低 macOS 15。解压后将 `曲袋.app` 拖入应用程序目录，当前仅 ad-hoc 签名，尚无 Developer ID 签名或公证。
+
+无需另外安装 Node.js 或后端服务。运行配置和服务数据保存在系统用户目录，压缩包便携分发不表示所有数据都保存在程序旁。
 
 Release 中提供 `SHA256SUMS` 与构建报告，供核对下载文件。从源码运行与打包见[开发与打包说明](docs/development.md)。
 

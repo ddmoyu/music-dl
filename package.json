@@ -1,7 +1,10 @@
 {
   "name": "qudai-dl",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.3",
+  "release": {
+    "prerelease": true
+  },
   "type": "module",
   "description": "曲袋 · 音乐下载",
   "packageManager": "pnpm@12.14.0",
@@ -19,6 +22,7 @@
     "check": "pnpm format:check && pnpm test && pnpm build",
     "version:sync": "node scripts/release.js sync-version",
     "desktop:setup": "node scripts/desktop-setup.js",
+    "service:download": "node scripts/download-service.js",
     "desktop:dev": "pnpm desktop:prepare && pnpm build && node scripts/desktop-dev.js",
     "desktop:build": "pnpm desktop:prepare && pnpm build && node scripts/desktop-build.js package",
     "prototype:dev": "vite --config vite.prototype.config.js --host 127.0.0.1",

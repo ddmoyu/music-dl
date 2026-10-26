@@ -1,7 +1,16 @@
 {
   "repository": "ddmoyu/music-service",
-  "revision": "4b1cd8d3470ba2863212763ea29b358938388b0a",
+  "revision": "2033efcfb0c57fc9f85341696120261f29473737",
+  "tag": "v0.1.30",
   "version": "0.1.30",
+  "manifestSha256": "1ef2a4650844b9b2192a72f75066bfe949419ab39ee74643a88317e9823ef54c",
+  "assets": {
+    "windows-x64": "3d79ace140abef5732aeb547562a9b1dce9cb2d4ef055825d6f36132e372728e",
+    "linux-x64": "f31b420232ef29be4c60a827e0d28119eb0da83b9ec1fbdaf1633be1ee6d82d0",
+    "linux-arm64": "15651032353d98ffd7ab00b38a5b474d8e876056fbb121ac75fba2d6e7373178",
+    "macos-x64": "d5a182506362b0a083fe82c5315bf4b557c045603e0a680001969c690b09bb41",
+    "macos-arm64": "cf127fbe41aae6089601cbf4d40a8fa68c25d2f309cd88ff03d0931ed6d9895f"
+  },
   "providers": [
     "kuwo",
     "fivesing",

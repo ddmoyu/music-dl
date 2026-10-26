@@ -4,9 +4,9 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { SERVICE_VERSION } from '../src/service-version.js';
+import { targets, hostTarget, releaseFiles } from './desktop-targets.js';
 
-export const releaseFiles = ['qudai-win_x64.exe', 'qudai-windows-x64.zip'];
-const output = path.resolve('.desktop-build/publish');
+export { releaseFiles };
 const json = async (file) => JSON.parse(await readFile(file, 'utf8'));
 const sha256 = (data) => createHash('sha256').update(data).digest('hex');
 
@@ -31,7 +31,9 @@ export function releaseNotes({ tag, repository, changes }) {
     if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error('无效的 GitHub 仓库');
     const base = `https://github.com/${repository}`;
     const download = `${base}/releases/download/${tag}`;
-    return `## 更新内容\n\n${changes}\n\n## 运行要求\n\nWindows x64，需要 WebView2 运行时。EXE 可直接运行，ZIP 解压后包含同一个 EXE。首次运行会释放本机服务并创建配置与数据，音源可用性及账号授权以实际结果为准。\n\n旧开发版本的服务数据库不自动迁移，升级前请阅读[数据与兼容性说明](${base}/blob/${tag}/docs/development.md#开发和运行)。\n\n[完整更新日志](${base}/blob/${tag}/CHANGELOG.md) · [SHA256 校验文件](${download}/SHA256SUMS) · [构建与资产报告](${download}/release-manifest.json)\n\n## 下载\n\n| 系统 | 下载 |\n| --- | --- |\n| Windows | [![EXE x64](https://img.shields.io/badge/EXE-x64-2d7d9a?style=flat-square)](${download}/qudai-win_x64.exe)<br>[![ZIP x64](https://img.shields.io/badge/ZIP-x64-67b7d1?style=flat-square)](${download}/qudai-windows-x64.zip) |\n`;
+    const badge = (label, name) =>
+        `[![${label}](https://img.shields.io/badge/${encodeURIComponent(label.replaceAll(' ', '-'))}-2d7d9a?style=flat-square)](${download}/${name})`;
+    return `## 更新内容\n\n${changes}\n\n## 运行要求\n\n- Windows x64：需要 WebView2 运行时，EXE 可直接运行，ZIP 包含同一个 EXE。\n- Linux x64/ARM64：以 Ubuntu 24.04 为基线，需要 GTK 3 与 WebKitGTK 4.1（libwebkit2gtk-4.1-0）。完整解压后运行 start.sh，不要单独移动可执行文件。\n- macOS Intel/Apple Silicon：最低 macOS 15，解压后将曲袋.app 拖入应用程序目录。当前仅 ad-hoc 签名，尚无 Developer ID 签名或公证。\n\n跨平台预览版，保留每个平台完整包内布局。音源可用性及账号授权以实际结果为准。旧开发版本数据库不自动迁移，升级前请阅读[数据与兼容性说明](${base}/blob/${tag}/docs/development.md#开发和运行)。\n\n[完整更新日志](${base}/blob/${tag}/CHANGELOG.md) · [SHA256 校验文件](${download}/SHA256SUMS) · [构建与资产报告](${download}/release-manifest.json)\n\n## 下载\n\n| 系统 | 下载 |\n| --- | --- |\n| Windows | ${badge('EXE x64', 'qudai-win_x64.exe')}<br>${badge('ZIP x64', 'qudai-windows-x64.zip')} |\n| Linux | ${badge('tar.gz x64', 'qudai-linux-x64.tar.gz')}<br>${badge('tar.gz ARM64', 'qudai-linux-arm64.tar.gz')} |\n| macOS | ${badge('APP Intel', 'qudai-macos-x64.zip')}<br>${badge('APP Apple Silicon', 'qudai-macos-arm64.zip')} |\n`;
 }
 
 export async function metadata(tag) {
@@ -43,7 +45,14 @@ export async function metadata(tag) {
         throw new Error('发布后端版本或固定提交无效');
     const changes = changelogEntry(await readFile('CHANGELOG.md', 'utf8'), pkg.version);
     const repository = process.env.GITHUB_REPOSITORY || 'ddmoyu/music-dl';
-    return { tag, version: pkg.version, repository, service, changes };
+    return {
+        tag,
+        version: pkg.version,
+        repository,
+        service,
+        changes,
+        prerelease: pkg.release?.prerelease === true,
+    };
 }
 
 export async function verifyAssets(directory, { tag, commit }) {
@@ -79,13 +88,14 @@ async function main() {
     }
     const tag = process.argv[3] || process.env.RELEASE_TAG || process.env.GITHUB_REF_NAME;
     const meta = await metadata(tag);
+    const output = path.resolve('.desktop-build/publish', tag);
     if (command === 'prepare') {
         await mkdir(output, { recursive: true });
         await writeFile(path.join(output, 'release-notes.md'), releaseNotes(meta));
         if (process.env.GITHUB_OUTPUT)
             await appendFile(
                 process.env.GITHUB_OUTPUT,
-                `version=${meta.version}\nbackend_repository=${meta.service.repository}\nbackend_revision=${meta.service.revision}\n`,
+                `version=${meta.version}\nprerelease=${meta.prerelease}\nmatrix=${JSON.stringify({ include: Object.entries(targets).map(([id, target]) => ({ target: id, runner: target.runner })) })}\n`,
             );
         console.log(`${tag}：版本与更新日志校验通过`);
         return;
@@ -94,20 +104,74 @@ async function main() {
     if (process.env.GITHUB_SHA && process.env.GITHUB_SHA !== commit)
         throw new Error('检出的提交与触发工作流的提交不一致');
     if (command === 'stage') {
+        const target = hostTarget();
+        const packaged = await json('.desktop-build/package.json');
+        if (packaged.target !== target.id) throw new Error('打包结果与 runner 目标不一致');
+        const artifact = path.resolve('.desktop-build', `artifact-${target.id}`);
+        await mkdir(artifact, { recursive: true });
         const assets = [];
-        for (const name of releaseFiles) {
-            const source = name.endsWith('.exe')
-                ? path.join('release/qudai-windows-x64', name)
-                : path.join('release', name);
+        for (const name of target.assets) {
+            const source = packaged.assets.find((file) => path.basename(file) === name);
+            if (!source) throw new Error(`缺少打包结果：${name}`);
             const data = await readFile(source);
-            await copyFile(source, path.join(output, name));
+            await copyFile(source, path.join(artifact, name));
             assets.push({ name, size: data.length, sha256: sha256(data) });
+        }
+        await writeFile(
+            path.join(artifact, `target-report-${target.id}.json`),
+            JSON.stringify(
+                { target: target.id, tag, version: meta.version, commit, assets },
+                null,
+                2,
+            ) + '\n',
+        );
+        console.log(`${target.id}：原生 runner 资产报告已生成`);
+        return;
+    }
+    if (command === 'assemble') {
+        const assets = [];
+        const reports = [];
+        const inputs = path.resolve('.desktop-build/artifacts');
+        const directories = await readdir(inputs);
+        if (
+            JSON.stringify(directories.sort()) !==
+            JSON.stringify(
+                Object.keys(targets)
+                    .map((id) => `desktop-${id}`)
+                    .sort(),
+            )
+        )
+            throw new Error('构建产物缺少平台或包含多余平台');
+        for (const [id, target] of Object.entries(targets)) {
+            const directory = path.join(inputs, `desktop-${id}`);
+            const report = await json(path.join(directory, `target-report-${id}.json`));
+            if (
+                report.target !== id ||
+                report.tag !== tag ||
+                report.version !== meta.version ||
+                report.commit !== commit ||
+                JSON.stringify(report.assets.map((asset) => asset.name)) !==
+                    JSON.stringify(target.assets)
+            )
+                throw new Error(`目标报告与本次构建不一致：${id}`);
+            const names = [...target.assets, `target-report-${id}.json`];
+            if (JSON.stringify((await readdir(directory)).sort()) !== JSON.stringify(names.sort()))
+                throw new Error('目标目录存在多余文件');
+            for (const asset of report.assets) {
+                const data = await readFile(path.join(directory, asset.name));
+                if (data.length !== asset.size || sha256(data) !== asset.sha256)
+                    throw new Error(`传输后的资产校验失败：${asset.name}`);
+                await copyFile(path.join(directory, asset.name), path.join(output, asset.name));
+                assets.push(asset);
+            }
+            reports.push(report);
         }
         const manifest = {
             version: meta.version,
             tag,
             commit,
             service: meta.service,
+            targets: reports,
             assets,
         };
         await writeFile(

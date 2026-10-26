@@ -3,9 +3,9 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { hostTarget } from './desktop-targets.js';
 
-if (process.platform !== 'win32' || process.arch !== 'x64')
-    throw new Error('当前桌面入口仅验证 Windows x64');
+const target = hostTarget();
 const config = JSON.parse(await readFile('neutralino.config.json', 'utf8'));
 const runtime = JSON.parse(await readFile('bin/runtime-version.json', 'utf8'));
 if (runtime.version !== config.cli.binaryVersion)
@@ -15,14 +15,21 @@ if (runtime.version !== config.cli.binaryVersion)
 // shows the app's own process name and icon without modifying the downloaded binary.
 const stage = path.resolve('.desktop-build', `dev-${crypto.randomUUID()}`);
 await mkdir(stage, { recursive: true });
-const executable = path.join(stage, `${config.cli.binaryName}-win_x64.exe`);
-await copyFile('bin/neutralino-win_x64.exe', executable);
+const executable = path.join(
+    stage,
+    target.platform === 'win32' ? `${config.cli.binaryName}-win_x64.exe` : config.cli.binaryName,
+);
+await copyFile(path.join('bin', target.runtime), executable);
 const require = createRequire(import.meta.url);
 const cli = require.resolve('@neutralinojs/neu');
 const { patchWindowsExecutable } = require(
     path.resolve(path.dirname(cli), '../src/modules/exepatch.js'),
 );
-await patchWindowsExecutable(executable);
+if (target.platform === 'win32') await patchWindowsExecutable(executable);
+else {
+    const { chmod } = await import('node:fs/promises');
+    await chmod(executable, 0o755);
+}
 const result = spawnSync(executable, ['--res-mode=directory', `--path=${process.cwd()}`], {
     stdio: 'inherit',
     windowsHide: true,

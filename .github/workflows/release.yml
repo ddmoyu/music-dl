@@ -1,4 +1,4 @@
-name: Publish Windows release
+name: Publish desktop preview
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: '待发布的 vX.Y.Z；手动运行仅构建验证，不创建 Release'
+        description: '待发布的 vX.Y.Z；手动运行仅验证，不创建 Release'
         required: true
         type: string
 
@@ -17,19 +17,37 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.release.outputs.matrix }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - id: release
+        run: node scripts/release.js prepare
+
   build:
-    name: Build and verify Windows x64
-    runs-on: windows-2025
-    timeout-minutes: 45
-    defaults:
-      run:
-        shell: pwsh
+    name: Build and verify ${{ matrix.target }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
     env:
-      MUSIC_SERVICE_BINARY: ${{ github.workspace }}/.desktop-build/backend-install/bin/music-service.exe
-      MUSIC_SERVICE_LICENSES: ${{ github.workspace }}/.desktop-build/backend-install/share/music-service/licenses
-      CMAKE_BUILD_PARALLEL_LEVEL: '3'
-      RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      WEBKIT_DISABLE_COMPOSITING_MODE: '1'
+      GDK_BACKEND: x11
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -39,58 +57,51 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - name: Validate tag, versions and changelog
-        id: release
-        run: node scripts/release.js prepare
-      - name: Check out pinned music-service
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: ${{ steps.release.outputs.backend_repository }}
-          ref: ${{ steps.release.outputs.backend_revision }}
-          path: .desktop-build/backend
-          persist-credentials: false
-      - name: Build, test and install music-service with static MSVC runtime
-        shell: cmd
-        working-directory: .desktop-build/backend
+      - name: Install Linux desktop runtime dependencies
+        if: runner.os == 'Linux'
         run: |
-          for /f "usebackq delims=" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSPATH=%%i"
-          call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
-          cmake --preset windows-msvc-release -DBUILD_TESTING=ON || exit /b 1
-          cmake --build --preset windows-msvc-release || exit /b 1
-          ctest --test-dir out/build/windows-msvc-release --output-on-failure --no-tests=error --timeout 120 --repeat until-pass:2 || exit /b 1
-          cmake --install out/build/windows-msvc-release --prefix ../backend-install || exit /b 1
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-0 libayatana-appindicator3-1 xvfb
       - run: pnpm install --frozen-lockfile
+      - name: Fetch and verify the pinned backend Release package
+        run: node scripts/download-service.js
       - run: pnpm desktop:setup
       - run: pnpm check
       - run: pnpm desktop:build
-      - name: Verify Windows metadata, imports and ZIP contents
+      - name: Verify Windows metadata and static CRT imports
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: ./scripts/verify-desktop.ps1 -ServiceBinary $env:MUSIC_SERVICE_BINARY
-      - name: Verify embedded resources and start the real service offline
+      - name: Verify archive, architecture, resources and real backend
         run: node scripts/smoke-release.js
-      - name: Generate checksums and build provenance
+      - name: Start the packaged Linux desktop and verify service shutdown
+        if: runner.os == 'Linux'
+        run: xvfb-run -a node scripts/smoke-desktop.js
+      - name: Start the packaged desktop and verify service shutdown
+        if: runner.os != 'Linux'
+        run: node scripts/smoke-desktop.js
+      - name: Record verified target assets
         run: node scripts/release.js stage
-      - name: Save verified release assets
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: release-assets
-          path: .desktop-build/publish/*
+          name: desktop-${{ matrix.target }}
+          path: .desktop-build/artifact-${{ matrix.target }}/*
           include-hidden-files: true
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
 
   publish:
-    name: Publish complete GitHub Release
-    if: github.event_name == 'push'
-    needs: build
+    name: Verify complete platform set and publish
+    needs: [prepare, build]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      RELEASE_TAG: ${{ github.ref_name }}
+      PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -100,11 +111,23 @@ jobs:
           node-version: 24
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
+          pattern: desktop-*
+          path: .desktop-build/artifacts
+      - name: Generate notes and verify all five native platform reports
+        run: |
+          node scripts/release.js prepare
+          node scripts/release.js assemble
+          node scripts/release.js verify
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
           name: release-assets
-          path: .desktop-build/publish
-      - name: Verify transferred assets and notes
-        run: node scripts/release.js verify
-      - name: Upload all assets before making the release public
+          path: .desktop-build/publish/${{ env.RELEASE_TAG }}/*
+          include-hidden-files: true
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Upload complete assets before publishing the Release
+        if: github.event_name == 'push'
         shell: bash
         run: |
           set -euo pipefail
@@ -112,11 +135,18 @@ jobs:
             echo 'Release already exists; refusing to replace published assets.' >&2
             exit 1
           fi
+          flags=()
+          if [ "$PRERELEASE" = true ]; then flags+=(--prerelease); fi
+          root=".desktop-build/publish/$RELEASE_TAG"
           gh release create "$RELEASE_TAG" \
-            .desktop-build/publish/qudai-win_x64.exe \
-            .desktop-build/publish/qudai-windows-x64.zip \
-            .desktop-build/publish/SHA256SUMS \
-            .desktop-build/publish/release-manifest.json \
-            --draft --verify-tag --title "曲袋 $RELEASE_TAG" \
-            --notes-file .desktop-build/publish/release-notes.md
-          gh release edit "$RELEASE_TAG" --draft=false --latest
+            "$root/qudai-win_x64.exe" "$root/qudai-windows-x64.zip" \
+            "$root/qudai-linux-x64.tar.gz" "$root/qudai-linux-arm64.tar.gz" \
+            "$root/qudai-macos-x64.zip" "$root/qudai-macos-arm64.zip" \
+            "$root/SHA256SUMS" "$root/release-manifest.json" \
+            --draft --verify-tag --title "曲袋 $RELEASE_TAG 跨平台预览版" \
+            --notes-file "$root/release-notes.md" "${flags[@]}"
+          if [ "$PRERELEASE" = true ]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$RELEASE_TAG" --draft=false --latest
+          fi
