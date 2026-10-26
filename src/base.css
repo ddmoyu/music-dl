@@ -144,13 +144,9 @@ header {
     gap: 9px;
     font-size: 16px;
 }
-.brand > svg {
-    padding: 4px;
-    width: 29px;
-    height: 29px;
-    background: var(--green);
-    color: white;
-    border-radius: 8px;
+.brand > img {
+    display: block;
+    flex-shrink: 0;
 }
 nav {
     display: flex;
@@ -264,7 +260,7 @@ nav button {
     flex: 1;
 }
 .row-copy > strong,
-.row-copy > .title {
+.row-title > .title {
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -278,7 +274,7 @@ nav button {
     text-align: left;
     border-radius: 3px;
 }
-.row-copy > .title:disabled {
+.row-title > .title:disabled {
     opacity: 1;
     cursor: default;
 }
@@ -289,6 +285,17 @@ nav button {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+.row-title {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+.row-title > .title {
+    min-width: 0;
+}
+.row-title > .pay-badge {
+    flex-shrink: 0;
 }
 .cover {
     width: 42px;
@@ -422,6 +429,7 @@ progress::-webkit-progress-value {
 }
 .credential-options {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 10px;
 }
@@ -439,6 +447,42 @@ progress::-webkit-progress-value {
     min-height: 45px;
     border-top: 1px solid var(--line);
     font-size: 12px;
+    padding-block: 12px;
+    flex-wrap: wrap;
+}
+.credential-copy {
+    min-width: 0;
+    flex: 1 1 180px;
+    overflow-wrap: anywhere;
+}
+.credential-copy p,
+.account-note {
+    margin: 5px 0 0;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.5;
+}
+.credential .actions {
+    flex-wrap: wrap;
+    margin-left: auto;
+    gap: 4px;
+}
+.credential .actions button {
+    padding-inline: 7px;
+}
+#credential-label {
+    width: 100%;
+    margin-bottom: 8px;
+}
+.pay-badge {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 10px;
+    color: #916c25;
+    border: 1px solid #e6d8b9;
+    padding: 0 4px;
+    border-radius: 3px;
+    vertical-align: middle;
 }
 .credential small {
     color: var(--muted);

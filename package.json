@@ -1,23 +1,24 @@
 {
-  "name": "music-dl",
+  "name": "qudai-dl",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
-  "description": "Music download desktop application",
+  "description": "曲袋 · 音乐下载",
   "packageManager": "pnpm@12.14.0",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "vite build",
+    "build": "vite build && pnpm brand:assets",
+    "brand:assets": "node scripts/brand-assets.js",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm format:check && pnpm test && pnpm build",
     "desktop:setup": "node scripts/desktop-setup.js",
-    "desktop:dev": "pnpm desktop:prepare && pnpm build && neu run --disable-auto-reload",
+    "desktop:dev": "pnpm desktop:prepare && pnpm build && node scripts/desktop-dev.js",
     "desktop:build": "pnpm desktop:prepare && pnpm build && node scripts/desktop-build.js package",
     "prototype:dev": "vite --config vite.prototype.config.js --host 127.0.0.1",
     "prototype:build": "vite build --config vite.prototype.config.js",
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@neutralinojs/neu": "11.8.0",
+    "@resvg/resvg-js": "2.6.2",
     "happy-dom": "^21.0.4",
     "prettier": "^3.9.10",
     "vite": "8.3.5",

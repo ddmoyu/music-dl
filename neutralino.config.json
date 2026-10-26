@@ -1,7 +1,10 @@
 {
   "$schema": "https://raw.githubusercontent.com/neutralinojs/neutralinojs/main/schemas/neutralino.config.schema.json",
   "applicationId": "io.musicservice.shiyin",
-  "version": "0.1.0",
+  "applicationName": "曲袋",
+  "description": "曲袋 · 音乐下载",
+  "applicationIcon": "dist/app/app-icon.png",
+  "version": "0.1.1",
   "defaultMode": "window",
   "port": 0,
   "documentRoot": "/dist/app/",
@@ -16,10 +19,13 @@
     "os.getPath",
     "os.execCommand",
     "os.spawnProcess",
+    "os.updateSpawnedProcess",
     "filesystem.getJoinedPath",
     "filesystem.getStats",
     "filesystem.createDirectory",
     "filesystem.readFile",
+    "filesystem.readDirectory",
+    "filesystem.copy",
     "filesystem.readBinaryFile",
     "filesystem.writeFile",
     "filesystem.move",
@@ -30,7 +36,8 @@
   ],
   "modes": {
     "window": {
-      "title": "拾音 · 音乐下载",
+      "title": "曲袋 · 音乐下载",
+      "icon": "/dist/app/app-icon.png",
       "width": 540,
       "height": 820,
       "minWidth": 500,
@@ -44,7 +51,7 @@
     }
   },
   "cli": {
-    "binaryName": "shiyin",
+    "binaryName": "qudai",
     "resourcesPath": "/dist/app/",
     "distributionPath": "/release/",
     "binaryVersion": "6.10.0"

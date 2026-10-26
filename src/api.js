@@ -1,8 +1,9 @@
 export class ServiceError extends Error {
-    constructor(message, code, status) {
+    constructor(message, code, status, details = []) {
         super(message);
         this.code = code;
         this.status = status;
+        this.details = details;
     }
 }
 export class Api {
@@ -35,6 +36,7 @@ export class Api {
                 result.error?.message || `请求失败 (${response.status})`,
                 result.error?.code,
                 response.status,
+                result.error?.details,
             );
         return result;
     }
@@ -53,9 +55,10 @@ export const sourceLabel = (source) =>
         jamendo: 'jm',
         bilibili: 'bl',
     })[source] || source;
-// Leading music services: MoonFox 2025 MAU (https://www.moonfox.cn/insight/news/2003).
+// Prefer kw for playback experience; then qq/kg/wyy by MoonFox 2025 MAU
+// (https://www.moonfox.cn/insight/news/2003).
 // Remaining sources use a fixed product order, not a measured market ranking.
-const sourceOrder = ['qq', 'kg', 'wyy', 'kw', 'mg', 'bl', 'qqyy', '5s', 'jx', 'jm'];
+const sourceOrder = ['kw', 'qq', 'kg', 'wyy', 'mg', 'bl', 'qqyy', '5s', 'jx', 'jm'];
 export function sortProviders(providers) {
     const rank = (provider) => {
         const index = sourceOrder.indexOf(sourceLabel(provider.source));

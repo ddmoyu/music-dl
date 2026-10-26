@@ -1,4 +1,5 @@
 import { filesystem as fs, resources } from '@neutralinojs/lib';
+import { SERVICE_VERSION } from './service-version.js';
 
 const digest = async (data) =>
     Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', data)), (byte) =>
@@ -9,7 +10,7 @@ export async function resolveServiceBinary(directory, context = window) {
     const manifest = context.NL_SHIYIN_SERVICE;
     if (manifest === undefined) {
         const executable = context.NL_OS === 'Windows' ? 'music-service.exe' : 'music-service';
-        return fs.getJoinedPath(context.NL_PATH, 'bin', 'service', executable);
+        return fs.getJoinedPath(context.NL_PATH, 'bin', 'service', SERVICE_VERSION, executable);
     }
     if (
         context.NL_OS !== 'Windows' ||

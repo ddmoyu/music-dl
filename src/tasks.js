@@ -92,7 +92,7 @@ export function watchTasks(api, synchronize, report, receive = () => {}) {
                 try {
                     while (!controller.signal.aborted) {
                         const { done, value } = await reader.read();
-                        if (done) break;
+                        if (done) throw new Error('任务事件流已关闭');
                         buffer += decoder.decode(value, { stream: true });
                         buffer = buffer.replace(/\r\n/g, '\n');
                         if (buffer.length > 262144) throw new Error('事件过大');
@@ -137,6 +137,7 @@ export function watchTasks(api, synchronize, report, receive = () => {}) {
     return stop;
 }
 function pause(ms, signal) {
+    if (signal.aborted) return Promise.resolve();
     return new Promise((resolve) => {
         const end = () => {
             clearTimeout(timer);

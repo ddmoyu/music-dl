@@ -3,10 +3,11 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { SERVICE_VERSION } from '../src/service-version.js';
 if (process.platform !== 'win32' || process.arch !== 'x64')
     throw new Error('当前打包入口仅验证 Windows x64；其他平台需提供对应服务和运行时。');
 const mode = process.argv[2] || 'prepare';
-const target = path.resolve('bin/service/music-service.exe');
+const target = path.resolve(`bin/service/${SERVICE_VERSION}/music-service.exe`);
 const source = process.env.MUSIC_SERVICE_BINARY || process.argv[3];
 await mkdir(path.dirname(target), { recursive: true });
 if (source && path.resolve(source) !== target) await copyFile(source, target);
@@ -19,6 +20,10 @@ try {
 }
 const version = spawnSync(target, ['version'], { encoding: 'utf8', windowsHide: true });
 if (version.status !== 0) throw new Error('music-service 无法运行');
+if (version.stdout.trim() !== `music-service ${SERVICE_VERSION}`)
+    throw new Error(
+        `当前前端需要 music-service ${SERVICE_VERSION}，请更新 MUSIC_SERVICE_BINARY 后重新打包`,
+    );
 console.log(version.stdout.trim());
 if (mode === 'package') {
     const config = JSON.parse(await readFile('neutralino.config.json', 'utf8'));
@@ -61,15 +66,17 @@ if (mode === 'package') {
         windowsHide: true,
     });
     if (result.status !== 0) throw new Error('桌面打包失败');
-    const bundle = path.join(stage, 'release/shiyin');
+    const binaryName = config.cli.binaryName;
+    const bundle = path.join(stage, 'release', binaryName);
     const files = await readdir(bundle);
-    if (files.length !== 1 || files[0] !== 'shiyin-win_x64.exe')
+    if (files.length !== 1 || files[0] !== `${binaryName}-win_x64.exe`)
         throw new Error('单文件构建包含多余文件，已停止发布');
     // neu --release zips before removing resources.neu. Zip the verified final folder instead.
     const cliRequire = createRequire(cli);
-    await cliRequire('zip-lib').archiveFolder(bundle, path.join(stage, 'shiyin-release.zip'));
+    const archive = path.join(stage, `${binaryName}-release.zip`);
+    await cliRequire('zip-lib').archiveFolder(bundle, archive);
     await mkdir('release', { recursive: true });
-    const releaseDirectory = path.resolve('release/shiyin-windows-x64');
+    const releaseDirectory = path.resolve('release', `${binaryName}-windows-x64`);
     await mkdir(releaseDirectory, { recursive: true });
     await copyFile(path.join(bundle, files[0]), path.join(releaseDirectory, files[0]));
     // Remove only known obsolete build artifacts, preserving user-created files and data.
@@ -78,6 +85,7 @@ if (mode === 'package') {
         if (path.dirname(legacy) !== releaseDirectory) throw new Error('无效的清理路径');
         await rm(legacy, { recursive: true, force: true });
     }
-    await copyFile(path.join(stage, 'shiyin-release.zip'), 'release/shiyin-windows-x64.zip');
-    console.log('Windows x64: release/shiyin-windows-x64.zip');
+    const releaseArchive = `release/${binaryName}-windows-x64.zip`;
+    await copyFile(archive, releaseArchive);
+    console.log(`Windows x64: ${releaseArchive}`);
 }

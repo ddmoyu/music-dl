@@ -11,6 +11,7 @@ export default defineConfig({
     server: {
         port: 5175,
         strictPort: true,
+        watch: { ignored: ['**/.tmp/**', '**/release/**'] },
     },
     test: {
         include: ['tests/**/*.test.js'],

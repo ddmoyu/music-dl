@@ -2,10 +2,11 @@ import { spawn, fork } from 'node:child_process';
 import { mkdir, readFile, writeFile, access } from 'node:fs/promises';
 import path from 'node:path';
 import { serviceConfig } from '../src/service-config.js';
+import { SERVICE_DATA_DIRECTORY, SERVICE_VERSION } from '../src/service-version.js';
 
 export async function startService({ binary, directory, origin }) {
     const configPath = path.join(directory, 'service.json');
-    const data = path.join(directory, 'data');
+    const data = path.join(directory, SERVICE_DATA_DIRECTORY);
     const downloads = path.join(directory, 'downloads');
     await mkdir(downloads, { recursive: true });
     await writeFile(configPath, JSON.stringify(serviceConfig(data, downloads, origin)), {
@@ -114,7 +115,7 @@ export function localServicePlugin() {
                         worker.send({
                             binary:
                                 process.env.MUSIC_SERVICE_BINARY ||
-                                path.resolve('bin/service/music-service.exe'),
+                                path.resolve(`bin/service/${SERVICE_VERSION}/music-service.exe`),
                             directory: path.resolve(
                                 `.tmp/development-service-${server.httpServer.address().port}`,
                             ),

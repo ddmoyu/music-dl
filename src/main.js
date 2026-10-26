@@ -12,12 +12,19 @@ import { bootService, openDownloads } from './desktop.js';
 import { readPreferences, savePreferences } from './preferences.js';
 import { Pager, virtualWindow } from './paging.js';
 import { searchPage, collectionPage } from './catalog.js';
-import { canTaskAction, watchTasks, applyTaskProjection } from './tasks.js';
+import { canTaskAction, watchTasks } from './tasks.js';
+import { TaskList } from './task-list.js';
+import { TaskSync } from './task-sync.js';
+import { DownloadSubmission } from './download-submission.js';
+import { Preview } from './preview.js';
 import { escapeHTML, updateHTML } from './dom.js';
 import { icon } from './icons.js';
+import { Accounts, accountStatus, membershipText, verificationHint } from './accounts.js';
+import { trackPay } from './track-pay.js';
 import './styles.css';
 
 const root = document.querySelector('#root');
+const brandIcon = `${import.meta.env.BASE_URL}favicon.svg`;
 const esc = escapeHTML;
 const state = {
     ready: false,
@@ -45,40 +52,22 @@ const state = {
     credentials: [],
     credentialSource: '',
     credentialProfile: '',
+    credentialId: '',
     paused: false,
-    pending: null,
-    playing: '',
-    playingId: '',
 };
 let api,
+    accounts,
     session,
     stopWatch,
     toastTimer,
     frame,
-    audio,
-    previewGeneration = 0,
+    player,
+    submission,
+    taskSync,
     lastSelected = -1;
 const catalog = new Pager(render);
-const tasks = new Pager(render);
+const tasks = new TaskList(render);
 let renderedController, renderedView;
-const taskRefresh = new Set();
-let pollOffset = 0;
-function receiveTask(event) {
-    if (!event || event.poll) {
-        const active = tasks.items.filter((task) => !terminal(task));
-        const wanted = event?.poll ? active.slice(pollOffset, pollOffset + 50) : active;
-        for (const task of wanted) taskRefresh.add(task.task_id);
-        pollOffset = active.length ? (pollOffset + 50) % active.length : 0;
-        return;
-    }
-    const index = tasks.items.findIndex((task) => task.task_id === event.task_id);
-    if (index < 0) return;
-    const updated = applyTaskProjection(tasks.items[index], event);
-    if (updated !== tasks.items[index]) {
-        tasks.items[index] = updated;
-        if (terminal(updated)) taskRefresh.add(updated.task_id);
-    }
-}
 const titles = {
     tracks: '歌曲',
     playlists: '歌单',
@@ -106,7 +95,7 @@ const statusText = {
 const button = (action, text, disabled = false, extra = '') =>
     `<button type="button" data-action="${esc(action)}" ${disabled ? 'disabled' : ''} ${extra}>${text}</button>`;
 const selectedItems = () => catalog.items.filter((item) => state.selected.has(identity(item)));
-const visibleTasks = () => tasks.items.filter((task) => !state.hidden.has(task.task_id));
+const visibleTasks = () => tasks.visible(state.hidden, state.taskFilter);
 const capability = () =>
     state.view === 'charts'
         ? 'charts'
@@ -136,12 +125,13 @@ function announce(message) {
         render();
     }, 5000);
 }
-async function persist() {
+async function persist(changes = {}) {
+    const current = { ...state, pending: submission?.pending ?? null, ...changes };
     await savePreferences({
-        settings: state.settings,
-        hidden: [...state.hidden].slice(-5000),
-        names: Object.fromEntries(Object.entries(state.names).slice(-2000)),
-        pending: state.pending,
+        settings: current.settings,
+        hidden: [...current.hidden],
+        names: Object.fromEntries(Object.entries(current.names).slice(-2000)),
+        pending: current.pending,
     });
 }
 function sourceSelect() {
@@ -152,7 +142,7 @@ function render() {
     if (!state.ready) {
         updateHTML(
             root,
-            `<main class="startup"><div class="brand">${icon('music', 28)}<h1>拾音</h1></div><p role="status">${esc(state.startupError || '正在启动本机音乐服务…')}</p>${state.startupError ? button('restart', '重新连接') : '<span class="spinner"></span>'}</main>`,
+            `<main class="startup"><div class="brand"><img src="${brandIcon}" alt="" width="36" height="36"><h1>曲袋</h1></div><p role="status">${esc(state.startupError || '正在启动本机音乐服务…')}</p>${state.startupError ? button('restart', '重新连接') : '<span class="spinner"></span>'}</main>`,
         );
         return;
     }
@@ -162,6 +152,11 @@ function render() {
         state[state.view === 'downloads' ? 'taskTop' : 'top'] = currentViewport.scrollTop;
         state.height = currentViewport.clientHeight || state.height;
     }
+    if (state.view === 'downloads')
+        state.taskTop = Math.min(
+            state.taskTop,
+            Math.max(0, visibleTasks().length * 84 - state.height),
+        );
     const main =
         state.view === 'settings'
             ? settingsHTML()
@@ -170,7 +165,7 @@ function render() {
               : catalogHTML();
     updateHTML(
         root,
-        `<div class="app"><header><div class="brand">${icon('music', 20)}<strong>拾音</strong></div><nav aria-label="主导航">${['charts', 'recommendations', 'search', 'downloads'].map((view) => button(`nav:${view}`, titles[view], false, `class="${state.view === view ? 'active' : ''}" aria-current="${state.view === view ? 'page' : 'false'}"`)).join('')}${button('nav:settings', icon('settings', 17), false, `aria-label="设置" class="${state.view === 'settings' ? 'active' : ''}"`)}</nav></header>${main}<footer><span role="status">${esc(state.toast || state.syncError || (state.playing ? `正在试听 · ${state.playing}` : ''))}</span>${state.playing ? button('stop-preview', '停止试听') : ''}<span class="connection" title="本机服务">${state.syncError ? '连接中断' : '已连接'}</span></footer></div>`,
+        `<div class="app"><header><div class="brand"><img src="${brandIcon}" alt="" width="29" height="29"><strong>曲袋</strong></div><nav aria-label="主导航">${['charts', 'recommendations', 'search', 'downloads'].map((view) => button(`nav:${view}`, titles[view], false, `class="${state.view === view ? 'active' : ''}" aria-current="${state.view === view ? 'page' : 'false'}"`)).join('')}${button('nav:settings', icon('settings', 17), false, `aria-label="设置" class="${state.view === 'settings' ? 'active' : ''}"`)}</nav></header>${main}<footer><span role="status" title="${esc(player.message)}">${esc(state.toast || state.syncError || player.message)}</span>${player.canSwitch ? button('switch-preview', player.busy ? '换源中…' : '换源', player.busy, `title="${esc(`已尝试 ${[...player.attemptedSources].map(sourceLabel).join(' / ')}`)}"`) : ''}${player.title ? button('stop-preview', '停止试听') : ''}<span class="connection" title="本机服务">${state.syncError ? '连接中断' : '已连接'}</span></footer></div>`,
     );
     const viewport = root.querySelector('.viewport');
     if (viewport) viewport.scrollTop = state.view === 'downloads' ? state.taskTop : state.top;
@@ -207,10 +202,15 @@ function catalogHTML() {
             )
             .join('')}</div>${sourceSelect()}</div>`;
     else toolbar = `<div class="toolbar"><h1>${titles[state.view]}</h1>${sourceSelect()}</div>`;
-    return `<section class="workspace">${toolbar}<div class="list-tools"><label><input type="checkbox" id="select-all" ${catalog.items.length && catalog.items.every((item) => state.selected.has(identity(item))) ? 'checked' : ''} ${!trackList() || !catalog.items.length ? 'disabled' : ''}> ${state.selected.size ? `已选 ${state.selected.size}` : `${catalog.items.length} 项`}</label>${trackList() ? button('download-selected', '下载所选', !state.selected.size || state.busy || !!state.pending, 'class="primary"') : ''}</div>${state.pending ? `<div class="notice">下载请求中断，结果尚未确认。${button('recover-submission', '重新确认', state.busy)}</div>` : ''}<div class="viewport" tabindex="0" aria-label="${state.detail ? '详情列表' : titles[state.view]}" data-key="catalog-scroll">${listHTML(false)}</div></section>`;
+    return `<section class="workspace">${toolbar}<div class="list-tools"><label><input type="checkbox" id="select-all" ${catalog.items.length && catalog.items.every((item) => state.selected.has(identity(item))) ? 'checked' : ''} ${!trackList() || !catalog.items.length ? 'disabled' : ''}> ${state.selected.size ? `已选 ${state.selected.size}` : `${catalog.items.length} 项`}</label>${trackList() ? button('download-selected', '下载所选', !state.selected.size || state.busy || !!submission.pending, 'class="primary"') : ''}</div>${submission.pending ? `<div class="notice">下载请求中断，结果尚未确认。${button('recover-submission', '重新确认', state.busy)}</div>` : ''}<div class="viewport" tabindex="0" aria-label="${state.detail ? '详情列表' : titles[state.view]}" data-key="catalog-scroll">${listHTML(false)}</div></section>`;
 }
 function downloadsHTML() {
     const chosen = tasks.items.filter((task) => state.taskSelected.has(task.task_id));
+    const count = tasks.complete
+        ? `${chosen.length ? `已选 ${chosen.length} / ` : ''}${visibleTasks().length} 项`
+        : tasks.error
+          ? '加载未完成'
+          : '正在加载';
     return `<section class="workspace"><div class="toolbar"><h1>下载任务</h1><div class="actions">${button('open-folder', icon('folder', 16) + ' 下载目录')}${button('pause-queue', state.paused ? '继续队列' : '暂停新任务', state.busy)}</div></div><div class="toolbar"><div class="tabs">${[
         ['', '全部'],
         ['completed', '已完成'],
@@ -227,7 +227,7 @@ function downloadsHTML() {
         )
         .join(
             '',
-        )}</div>${button('refresh-tasks', '刷新', tasks.loading)}</div><div class="list-tools"><label><input type="checkbox" id="select-tasks" ${visibleTasks().length && visibleTasks().every((task) => state.taskSelected.has(task.task_id)) ? 'checked' : ''}> ${chosen.length ? `已选 ${chosen.length}` : `${visibleTasks().length} 项`}</label><div class="actions">${button('task-cancel', '取消', state.busy || !chosen.some((t) => canTaskAction(t, 'cancel')))}${button('task-retry', '重试', state.busy || !chosen.some((t) => canTaskAction(t, 'retry')))}${button('task-hide', '移除记录', state.busy || !chosen.some(terminal))}</div></div>${state.pending ? `<div class="notice">下载请求中断，结果尚未确认。${button('recover-submission', '重新确认', state.busy)}</div>` : ''}${state.paused ? '<div class="notice">新任务已暂停，正在执行的任务会继续。</div>' : ''}<div class="viewport" tabindex="0" aria-label="下载任务列表" data-key="task-scroll">${listHTML(true)}</div></section>`;
+        )}</div>${button('refresh-tasks', '刷新', tasks.loading)}</div><div class="list-tools"><label><input type="checkbox" id="select-tasks" ${!tasks.complete || !visibleTasks().length ? 'disabled' : ''} ${visibleTasks().length && visibleTasks().every((task) => state.taskSelected.has(task.task_id)) ? 'checked' : ''}> ${count}</label><div class="actions">${button('task-cancel', '取消', state.busy || !chosen.some((t) => canTaskAction(t, 'cancel')))}${button('task-retry', '重试', state.busy || !chosen.some((t) => canTaskAction(t, 'retry')))}${button('task-hide', '移除记录', state.busy || !chosen.some(terminal))}</div></div>${submission.pending ? `<div class="notice">下载请求中断，结果尚未确认。${button('recover-submission', '重新确认', state.busy)}</div>` : ''}${state.paused ? '<div class="notice">新任务已暂停，正在执行的任务会继续。</div>' : ''}<div class="viewport" tabindex="0" aria-label="下载任务列表" data-key="task-scroll">${listHTML(true)}</div></section>`;
 }
 function listHTML(downloads) {
     const pager = downloads ? tasks : catalog;
@@ -248,12 +248,13 @@ function listHTML(downloads) {
         .map((item) => (downloads ? taskHTML(item) : rowHTML(item)))
         .join(
             '',
-        )}<div style="height:${window.after}px" aria-hidden="true"></div>${empty}<div class="list-end">${pager.loading ? '<span class="spinner"></span> 正在加载' : pager.error ? `<span role="alert">${esc(pager.error)}</span>${button('load-more', '重试')}` : pager.hasMore ? button('load-more', '继续加载') : pager.capped ? '已加载 5000 项，请缩小搜索范围' : items.length ? '已加载全部' : ''}</div>`;
+        )}<div style="height:${window.after}px" aria-hidden="true"></div>${empty}<div class="list-end">${pager.loading ? '<span class="spinner"></span> 正在加载' : pager.error ? `<span role="alert">${esc(pager.error)}</span>${button(downloads ? 'refresh-tasks' : 'load-more', '重试')}` : downloads ? '' : pager.hasMore ? button('load-more', '继续加载') : pager.capped ? '已加载 5000 项，请缩小搜索范围' : items.length ? '已加载全部' : ''}</div>`;
 }
 function rowHTML(item) {
     const id = identity(item),
         track = trackList(),
-        playing = state.playingId === id;
+        playing = player.id === id && player.status !== 'failed';
+    const pay = trackPay(item.pay);
     const caption =
         artistNames(item) ||
         item.creator?.name ||
@@ -268,19 +269,24 @@ function rowHTML(item) {
             state.providers.find((p) => p.source === item.ref?.source),
             'resolve_audio',
         );
-    return `<article class="row ${state.selected.has(id) ? 'selected' : ''}" data-key="${esc(id)}"><input type="checkbox" aria-label="选择 ${esc(displayName(item))}" data-select="${esc(id)}" ${state.selected.has(id) ? 'checked' : ''} ${!track || disabled ? 'disabled' : ''}><div class="cover">${artwork ? `<img src="${esc(artwork)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : icon(track ? 'music' : 'folder', 20)}</div><div class="row-copy"><button class="title" data-open="${esc(id)}" ${track ? 'disabled' : ''}>${esc(displayName(item))}</button><p title="${esc(compactText(caption))}">${esc(compactText(caption || (track ? item.album?.title : '') || '—'))}</p></div>${state.source === 'all' && !state.detail ? `<span class="source-badge">${esc(sourceLabel(item.ref?.source))}</span>` : ''}${track ? `<div class="actions">${button(`preview:${id}`, icon(playing ? 'stop' : 'play', 16), disabled, `aria-label="${playing ? '停止试听' : '试听'} ${esc(displayName(item))}" title="${playing ? '停止试听' : '试听'}" aria-pressed="${playing}"`)}${button(`download:${id}`, icon('download', 16), disabled || state.busy || !!state.pending, `aria-label="下载 ${esc(displayName(item))}"`)}</div>` : button(`open:${id}`, '查看')}</article>`;
+    return `<article class="row ${state.selected.has(id) ? 'selected' : ''}" data-key="${esc(id)}"><input type="checkbox" aria-label="选择 ${esc(displayName(item))}" data-select="${esc(id)}" ${state.selected.has(id) ? 'checked' : ''} ${!track || disabled ? 'disabled' : ''}><div class="cover">${artwork ? `<img src="${esc(artwork)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : icon(track ? 'music' : 'folder', 20)}</div><div class="row-copy"><div class="row-title"><button class="title" data-open="${esc(id)}" ${track ? 'disabled' : ''}>${esc(displayName(item))}</button>${track && pay.badge ? `<span class="pay-badge" title="${esc(pay.tooltip)}">${esc(pay.badge)}</span>` : ''}</div><p title="${esc(compactText(caption))}">${esc(compactText(caption || (track ? item.album?.title : '') || '—'))}</p></div>${state.source === 'all' && !state.detail ? `<span class="source-badge">${esc(sourceLabel(item.ref?.source))}</span>` : ''}${track ? `<div class="actions">${button(`preview:${id}`, icon(playing ? 'stop' : 'play', 16), disabled, `aria-label="${playing ? '停止试听' : '试听'} ${esc(displayName(item))}" title="${playing ? '停止试听' : esc(pay.playHint)}" aria-pressed="${playing}"`)}${button(`download:${id}`, icon('download', 16), disabled || state.busy || !!submission.pending, `aria-label="下载 ${esc(displayName(item))}" title="${esc(pay.downloadHint)}"`)}</div>` : button(`open:${id}`, '查看')}</article>`;
 }
 function taskHTML(task) {
     const progress = task.progress || {},
+        pendingSource = task.source_retry?.pending && !terminal(task),
         percent =
-            progress.total_bytes > 0
+            !pendingSource && progress.total_bytes > 0
                 ? Math.min(100, (progress.received_bytes / progress.total_bytes) * 100)
                 : null;
     const title =
         state.names[identity({ ref: task.original_track })] ||
         task.original_track?.id ||
         task.task_id;
-    const detail =
+    const source = sourceLabel(task.original_track?.source || ''),
+        actual = sourceLabel(task.actual_track?.source || ''),
+        provenance = task.source_switched && actual ? `${source} → ${actual}` : source;
+    const attempted = task.source_retry?.attempted_sources || [];
+    const progressDetail =
         task.error?.message ||
         task.warnings?.map((warning) => warning.message || warning.code).join(' · ') ||
         [
@@ -290,7 +296,52 @@ function taskHTML(task) {
         ]
             .filter(Boolean)
             .join(' ');
-    return `<article class="row task-row ${state.taskSelected.has(task.task_id) ? 'selected' : ''}" data-key="${esc(task.task_id)}" data-task="${esc(task.task_id)}"><input type="checkbox" aria-label="选择任务 ${esc(title)}" data-task-select="${esc(task.task_id)}" ${state.taskSelected.has(task.task_id) ? 'checked' : ''}><div class="row-copy"><strong>${esc(title)}</strong><p title="${esc(detail)}">${esc(detail || sourceLabel(task.original_track?.source))}</p>${percent !== null && !terminal(task) ? `<progress max="100" value="${percent}" aria-label="下载进度"></progress>` : ''}</div><span class="status ${task.status === 'failed' ? 'danger' : ''}">${statusText[task.status] || esc(task.status)}${percent !== null && !terminal(task) ? ` ${Math.floor(percent)}%` : ''}</span><div class="actions">${canTaskAction(task, 'cancel') ? button(`cancel:${task.task_id}`, '取消', state.busy) : ''}${canTaskAction(task, 'retry') ? button(`retry:${task.task_id}`, '重试', state.busy) : ''}${terminal(task) ? button(`hide:${task.task_id}`, icon('close', 16), state.busy, 'aria-label="移除记录"') : ''}${button(`menu:${task.task_id}`, '⋯', state.busy, 'aria-label="任务操作"')}</div></article>`;
+    const detail = [provenance, progressDetail].filter(Boolean).join(' · ');
+    const hint = [
+        detail,
+        attempted.length ? `已尝试 ${attempted.map(sourceLabel).join(' / ')}` : '',
+    ]
+        .filter(Boolean)
+        .join(' · ');
+    return `<article class="row task-row ${state.taskSelected.has(task.task_id) ? 'selected' : ''}" data-key="${esc(task.task_id)}" data-task="${esc(task.task_id)}"><input type="checkbox" aria-label="选择任务 ${esc(title)}" data-task-select="${esc(task.task_id)}" ${state.taskSelected.has(task.task_id) ? 'checked' : ''}><div class="row-copy"><strong>${esc(title)}</strong><p title="${esc(hint)}">${esc(detail)}</p>${percent !== null && !terminal(task) ? `<progress max="100" value="${percent}" aria-label="下载进度"></progress>` : ''}</div><span class="status ${task.status === 'failed' ? 'danger' : ''}">${pendingSource ? '等待换源' : statusText[task.status] || esc(task.status)}${percent !== null && !terminal(task) ? ` ${Math.floor(percent)}%` : ''}</span><div class="actions">${canTaskAction(task, 'cancel') ? button(`cancel:${task.task_id}`, '取消', state.busy) : ''}${canTaskAction(task, 'retry') ? button(`retry:${task.task_id}`, '重试', state.busy) : ''}${terminal(task) ? button(`hide:${task.task_id}`, icon('close', 16), state.busy, 'aria-label="移除记录"') : ''}${button(`menu:${task.task_id}`, '⋯', state.busy, 'aria-label="任务操作"')}</div></article>`;
+}
+function accountsHTML(sources, provider, methods) {
+    const editing = state.credentials.find((item) => item.credential_id === state.credentialId);
+    const switching = state.credentials.some(
+        (item) =>
+            item.source === provider?.source &&
+            item.enabled &&
+            item.credential_id !== editing?.credential_id,
+    );
+    return `<div class="settings-group"><h2>平台账号</h2><form id="credential-form">
+        <div class="credential-options"><select id="credential-source" aria-label="凭据来源" ${editing ? 'disabled' : ''}>${sources.map((p) => `<option value="${esc(p.source)}" ${p.source === provider?.source ? 'selected' : ''}>${esc(sourceLabel(p.source))}</option>`).join('')}</select>
+        <select id="credential-profile" aria-label="凭据类型" ${editing ? 'disabled' : ''}>${methods.map((m) => `<option value="${esc(m.auth_profile)}" ${m.auth_profile === (editing?.auth_profile || state.credentialProfile) ? 'selected' : ''}>${esc(m.auth_profile === 'web_cookie' ? '网页 Cookie' : m.auth_profile)}</option>`).join('')}</select>
+        <button type="submit" ${state.busy || !methods.length ? 'disabled' : ''}>${editing?.enabled ? '保存更新' : '保存并启用'}</button>${editing ? button('credential-new', '取消') : ''}</div>
+        <input id="credential-label" data-private aria-label="账号名称" placeholder="账号名称（选填）" maxlength="128" value="${esc(editing?.label || '')}">
+        <textarea id="cookie" aria-label="Cookie" placeholder="${editing?.enabled ? '粘贴新 Cookie；留空仅修改名称' : '粘贴 Cookie'}" autocomplete="off" spellcheck="false" maxlength="32768"></textarea>
+        ${switching ? '<p class="account-note">启用后，同平台原账号将停用并清除 Cookie。</p>' : editing && !editing.enabled ? '<p class="account-note">已停用账号需重新填写 Cookie 才能启用。</p>' : ''}
+        </form>${accounts?.error ? `<p role="alert" class="account-note danger">${esc(compactText(accounts.error))}${button('credential-refresh', '重试')}</p>` : ''}
+        <div class="credentials">${state.credentials
+            .map((item) => {
+                const method = state.providers
+                    .find((p) => p.source === item.source)
+                    ?.auth_methods.find((m) => m.auth_profile === item.auth_profile);
+                const pending = item.verification?.state === 'pending';
+                const selected =
+                    accounts?.selections[item.source]?.credential_id === item.credential_id;
+                const checkHint = verificationHint(item.verification?.error_code);
+                return `<div class="credential" data-key="${esc(item.credential_id)}"><div class="credential-copy"><strong>${esc(compactText(item.label || sourceLabel(item.source)))}</strong>
+                <p>${esc(sourceLabel(item.source))} · ${selected && item.enabled ? '使用中 · ' : ''}${accountStatus(item)}</p>
+                ${item.enabled ? `<p title="${esc(item.membership?.checked_at ? `最近查询：${new Date(item.membership.checked_at).toLocaleString('zh-CN')}` : '尚未确认会员信息')}">${esc(membershipText(item.membership))}</p>` : ''}
+                ${checkHint && item.enabled ? `<p>${esc(checkHint)}</p>` : ''}
+                ${item.enabled && item.membership?.error_code && item.membership.error_code !== item.verification?.error_code ? '<p>会员信息暂不可用</p>' : ''}
+                ${item.secret_cleanup_pending ? '<p class="danger">Cookie 清理未完成</p>' : ''}</div>
+                <div class="actions">${item.status !== 'revoked' ? button(`credential-edit:${item.credential_id}`, item.enabled ? '更新' : '启用', state.busy || !method) : ''}
+                ${pending ? button(`credential-cancel:${item.credential_id}`, '取消校验', state.busy) : item.enabled && method?.supports_verify ? button(`credential-verify:${item.credential_id}`, '验证', state.busy) : ''}
+                ${item.enabled || item.secret_cleanup_pending ? button(`credential-disable:${item.credential_id}`, item.secret_cleanup_pending && !item.enabled ? '重试清理' : '停用', state.busy) : ''}
+                ${item.status !== 'revoked' ? button(`credential-delete:${item.credential_id}`, '删除', state.busy) : ''}</div></div>`;
+            })
+            .join('')}</div></div>`;
 }
 function settingsHTML() {
     const sources = state.providers.filter((p) =>
@@ -316,9 +367,7 @@ function settingsHTML() {
             (d) =>
                 `<option value="${esc(d.destination_id)}" ${state.settings.destination === d.destination_id ? 'selected' : ''}>${esc(d.name)}</option>`,
         )
-        .join(
-            '',
-        )}</select></label></div><div class="settings-group"><h2>平台凭据</h2><form id="credential-form"><div class="credential-options"><select id="credential-source" aria-label="凭据来源">${sources.map((p) => `<option value="${esc(p.source)}" ${p.source === provider?.source ? 'selected' : ''}>${esc(sourceLabel(p.source))}</option>`).join('')}</select><select id="credential-profile" aria-label="凭据类型">${methods.map((m) => `<option value="${esc(m.auth_profile)}" ${m.auth_profile === state.credentialProfile ? 'selected' : ''}>${esc(m.auth_profile)}</option>`).join('')}</select><button type="submit" ${state.busy || !methods.length ? 'disabled' : ''}>保存并使用</button></div><textarea id="cookie" aria-label="Cookie" placeholder="粘贴 Cookie" autocomplete="off" spellcheck="false" maxlength="32768"></textarea></form><div class="credentials">${state.credentials.map((c) => `<div class="credential"><span>${esc(sourceLabel(c.source))} · ${esc(c.label || c.auth_profile)} <small>${esc(c.status || '')}</small></span><div class="actions">${button(`credential-default:${c.credential_id}`, '使用', state.busy)}${button(`credential-verify:${c.credential_id}`, '验证', state.busy)}${button(`credential-delete:${c.credential_id}`, '删除', state.busy)}</div></div>`).join('')}</div></div></section>`;
+        .join('')}</select></label></div>${accountsHTML(sources, provider, methods)}</section>`;
 }
 function resetCatalog() {
     state.trail = [];
@@ -425,13 +474,13 @@ async function openItem(item) {
 }
 async function navigate(view) {
     closeMenu();
-    stopPreview();
+    accounts?.stop();
     state.view = view;
     if (view === 'downloads') {
         render();
-        if (!tasks.fetchPage) await resetTasks();
+        if (!tasks.fetchPage || (!tasks.complete && !tasks.loading)) await resetTasks();
         else {
-            receiveTask(null);
+            taskSync.receive(null);
             stopWatch?.refresh?.();
         }
     } else if (view === 'settings') {
@@ -444,62 +493,27 @@ async function navigate(view) {
 }
 async function resetTasks() {
     state.taskTop = 0;
+    lastSelected = -1;
     state.taskSelected.clear();
-    tasks.reset(collectionPage(api, '/downloads', { status: state.taskFilter || undefined }));
-    taskRefresh.clear();
-    await tasks.load();
-}
-async function synchronizeTasks() {
-    if (!tasks.fetchPage || tasks.loading || state.view !== 'downloads') {
-        await api.request('/info');
-        return;
-    }
-    const generation = tasks.controller;
-    const result = await api.request('/downloads', {
-        query: { limit: 50, status: state.taskFilter || undefined },
-        signal: generation.signal,
+    tasks.reset(async (cursor, signal) => {
+        const { data } = await api.request('/downloads', { query: { limit: 100, cursor }, signal });
+        return { items: data.items, nextCursor: data.page.next_cursor };
     });
-    if (generation !== tasks.controller) return;
-    const loaded = new Map(tasks.items.map((task) => [task.task_id, task]));
-    for (const task of result.data.items)
-        if (!loaded.has(task.task_id) || task.version >= loaded.get(task.task_id).version)
-            loaded.set(task.task_id, task);
-    for (const task of result.data.items)
-        if (task.version >= loaded.get(task.task_id).version) taskRefresh.delete(task.task_id);
-    const active = tasks.items.filter((task) => taskRefresh.has(task.task_id)).slice(0, 50);
-    for (let i = 0; i < active.length; i += 4)
-        await Promise.all(
-            active.slice(i, i + 4).map(async (task) => {
-                const { data } = await api.request(
-                    `/downloads/${encodeURIComponent(task.task_id)}`,
-                    { signal: generation.signal },
-                );
-                if (data.version >= task.version) loaded.set(task.task_id, data);
-                if (
-                    data.version >=
-                    (tasks.items.find((item) => item.task_id === task.task_id)?.version || 0)
-                )
-                    taskRefresh.delete(task.task_id);
-            }),
-        );
-    if (generation !== tasks.controller) return;
-    for (const task of tasks.items)
-        if (task.version > (loaded.get(task.task_id)?.version || 0)) loaded.set(task.task_id, task);
-    tasks.items = [...loaded.values()]
-        .sort((a, b) => b.created_at.localeCompare(a.created_at))
-        .slice(0, 5000);
-    const retainedIds = new Set(tasks.items.map((task) => task.task_id));
-    for (const id of taskRefresh) if (!retainedIds.has(id)) taskRefresh.delete(id);
-    render();
-    return taskRefresh.size > 0;
+    taskSync.refresh.clear();
+    await tasks.load();
+    if (tasks.complete) {
+        taskSync.receive(null);
+        stopWatch?.refresh?.();
+    }
 }
+const synchronizeTasks = () => taskSync.synchronize(state.view === 'downloads');
 async function enqueue(items) {
     if (!items.length) return;
-    if (state.pending) throw new Error('请先确认上次提交结果');
+    if (submission.pending) throw new Error('请先确认上次提交结果');
     for (let offset = 0; offset < items.length; offset += 100) {
         const chunk = items.slice(offset, offset + 100);
         for (const item of chunk) state.names[identity(item)] = displayName(item);
-        await submitDownload({
+        await submission.submit({
             key: crypto.randomUUID(),
             route: '/download-batches',
             body: { items: chunk.map((item) => downloadIntent(item, state.settings)) },
@@ -508,38 +522,6 @@ async function enqueue(items) {
     state.selected.clear();
     announce(`已提交 ${items.length} 首歌曲`);
 }
-async function submitDownload(pending) {
-    state.pending = pending;
-    try {
-        await persist();
-    } catch (error) {
-        // No request has been sent: do not leave a false uncertain-submission state.
-        state.pending = null;
-        throw new Error('无法保存下载记录，任务尚未提交。请检查应用数据目录的写入权限。', {
-            cause: error,
-        });
-    }
-    await recoverSubmission();
-}
-async function recoverSubmission() {
-    if (!state.pending) return;
-    const pending = state.pending;
-    try {
-        await api.request(pending.route, { method: 'POST', body: pending.body, key: pending.key });
-    } catch (error) {
-        if (error.status && error.status < 500 && error.status !== 408 && error.status !== 429) {
-            state.pending = null;
-            await persist().catch(() => {});
-        }
-        throw error;
-    }
-    state.pending = null;
-    try {
-        await persist();
-    } catch (error) {
-        throw new Error('任务已提交，但本地记录保存失败。请到下载任务查看进度。', { cause: error });
-    }
-}
 async function taskAction(action, ids) {
     const chosen = tasks.items.filter(
         (task) => ids.includes(task.task_id) && canTaskAction(task, action),
@@ -547,11 +529,11 @@ async function taskAction(action, ids) {
     if (action === 'hide') {
         if (!chosen.length || !confirm(`从列表移除 ${chosen.length} 条记录？已下载的文件会保留。`))
             return;
-        chosen.forEach((task) => {
-            state.hidden.add(task.task_id);
-            state.taskSelected.delete(task.task_id);
-        });
-        await persist();
+        const hidden = new Set(state.hidden);
+        chosen.forEach((task) => hidden.add(task.task_id));
+        await persist({ hidden });
+        state.hidden = hidden;
+        chosen.forEach((task) => state.taskSelected.delete(task.task_id));
         render();
         return;
     }
@@ -559,114 +541,93 @@ async function taskAction(action, ids) {
     for (const task of chosen) {
         try {
             if (action === 'retry') {
-                if (state.pending) throw new Error('请先确认上次提交结果');
-                await submitDownload({
+                if (submission.pending) throw new Error('请先确认上次提交结果');
+                await submission.submit({
                     key: crypto.randomUUID(),
                     route: `/downloads/${encodeURIComponent(task.task_id)}/retry`,
                 });
-            } else
+            } else {
                 await api.request(`/downloads/${encodeURIComponent(task.task_id)}/cancel`, {
                     method: 'POST',
                 });
+                taskSync.refresh.add(task.task_id);
+            }
         } catch (error) {
             errors.push(error.message);
-            if (state.pending) break;
+            if (submission.pending) break;
         }
     }
     await synchronizeTasks();
     announce(errors.length ? errors.join('；') : '操作已提交');
 }
-function stopPreview() {
-    previewGeneration++;
-    if (audio) {
-        audio.onended = null;
-        audio.onerror = null;
-        audio.pause();
-        audio.removeAttribute('src');
-        audio.load();
-        audio = null;
-    }
-    state.playing = '';
-    state.playingId = '';
-}
-async function preview(item) {
-    if (state.playingId === identity(item)) {
-        stopPreview();
-        render();
-        return;
-    }
-    stopPreview();
-    render();
-    const generation = previewGeneration;
-    const { data: asset } = await api.request('/assets/resolve', {
-        method: 'POST',
-        body: {
-            track: item.ref,
-            context_ref: item.context_ref,
-            quality: 'standard',
-            quality_policy: 'allow_lower',
-            allow_preview: true,
-        },
-    });
-    if (generation !== previewGeneration) return;
-    const { data: media } = await api.request('/media-access', {
-        method: 'POST',
-        body: {
-            target: { kind: 'asset', id: asset.asset_id },
-            mode: 'auto',
-            auth: 'ticket',
-            ttl_seconds: 60,
-        },
-    });
-    if (generation !== previewGeneration) return;
-    audio = new Audio(media.url);
-    audio.onended = () => {
-        stopPreview();
-        render();
-    };
-    audio.onerror = () => {
-        stopPreview();
-        announce('试听失败，音源暂不可用');
-    };
-    try {
-        await audio.play();
-    } catch (error) {
-        if (generation !== previewGeneration) return;
-        stopPreview();
-        throw error;
-    }
-    if (generation !== previewGeneration) return;
-    state.playing = displayName(item);
-    state.playingId = identity(item);
-    render();
-}
 async function credentials() {
-    const { data } = await api.request('/credentials');
-    state.credentials = data.items || [];
+    await accounts.refresh();
 }
 async function saveCredential() {
     const source = root.querySelector('#credential-source').value,
         auth_profile = root.querySelector('#credential-profile').value;
     const field = root.querySelector('#cookie'),
         cookie = field.value.trim();
-    if (!cookie) throw new Error('请填写 Cookie');
+    const label =
+        root.querySelector('#credential-label').value.trim() || `${sourceLabel(source)} Cookie`;
+    const current = state.credentials.find((item) => item.credential_id === state.credentialId);
+    if (!cookie && (!current || !current.enabled)) throw new Error('请填写新的 Cookie 后启用');
     field.value = '';
-    const { data } = await api.request('/credentials', {
-        method: 'POST',
-        body: {
-            source,
-            kind: 'cookie',
-            auth_profile,
-            label: `${sourceLabel(source)} Cookie`,
-            secret: { cookie },
-        },
+    await changeAccount(async () => {
+        if (!current) {
+            await api.request('/credentials', {
+                method: 'POST',
+                body: {
+                    source,
+                    kind: 'cookie',
+                    auth_profile,
+                    label,
+                    enabled: true,
+                    secret: { cookie },
+                },
+            });
+        } else if (current.enabled) {
+            await api.request(`/credentials/${encodeURIComponent(current.credential_id)}`, {
+                method: 'PUT',
+                body: { label, ...(cookie ? { secret: { cookie } } : {}) },
+            });
+        } else {
+            if (label !== current.label)
+                await api.request(`/credentials/${encodeURIComponent(current.credential_id)}`, {
+                    method: 'PUT',
+                    body: { label },
+                });
+            await api.request(`/credential-defaults/${encodeURIComponent(source)}`, {
+                method: 'PUT',
+                body: { credential_id: current.credential_id, secret: { cookie } },
+            });
+        }
     });
-    await api.request(`/credential-defaults/${encodeURIComponent(source)}`, {
-        method: 'PUT',
-        body: { credential_id: data.credential_id },
-    });
-    await credentials();
-    announce('凭据已保存并设为默认');
+    editCredential('');
+    announce(cookie ? '账号已保存，登录和会员状态将自动更新' : '名称已更新');
+}
+async function changeAccount(work, invalidate = true) {
+    accounts.stop();
+    try {
+        await work();
+    } finally {
+        if (invalidate) resetCatalog();
+        if (state.view === 'settings') await credentials();
+    }
+}
+function editCredential(id) {
+    const current = state.credentials.find((item) => item.credential_id === id);
+    state.credentialId = current?.credential_id || '';
+    if (current) {
+        state.credentialSource = current.source;
+        state.credentialProfile = current.auth_profile;
+    }
+    render();
+    const cookie = root.querySelector('#cookie');
+    if (cookie) cookie.value = '';
+    const label = root.querySelector('#credential-label');
+    if (label) label.value = current?.label || '';
+    cookie?.focus();
 }
 function closeMenu() {
     document.querySelector('.context-menu')?.remove();
@@ -775,7 +736,7 @@ root.addEventListener('change', (event) => {
     if (target.id === 'credential-source') {
         state.credentialSource = target.value;
         state.credentialProfile = '';
-        render();
+        editCredential('');
     }
     if (target.id === 'credential-profile') state.credentialProfile = target.value;
     const setting = {
@@ -784,8 +745,16 @@ root.addEventListener('change', (event) => {
         destination: 'destination',
     }[target.id];
     if (setting) {
-        state.settings[setting] = target.value;
-        void safely(persist);
+        const value = target.value;
+        if (state.busy) {
+            render();
+            return;
+        }
+        void safely(async () => {
+            const settings = { ...state.settings, [setting]: value };
+            await persist({ settings });
+            state.settings = settings;
+        });
     }
 });
 root.addEventListener('click', (event) => {
@@ -803,15 +772,12 @@ root.addEventListener('click', (event) => {
     closeMenu();
     if (action === 'menu') {
         const bounds = target.getBoundingClientRect();
-        menu(
-            tasks.items.find((t) => t.task_id === value),
-            bounds.left,
-            bounds.bottom,
-        );
+        menu(tasks.get(value), bounds.left, bounds.bottom);
         return;
     }
     const dispatch = [
         'preview',
+        'switch-preview',
         'stop-preview',
         'nav',
         'type',
@@ -825,6 +791,10 @@ root.addEventListener('click', (event) => {
         ? runView
         : safely;
     void dispatch(async () => {
+        if (['preview', 'switch-preview', 'stop-preview'].includes(action)) {
+            clearTimeout(toastTimer);
+            state.toast = '';
+        }
         if (action === 'restart') {
             location.reload();
             return;
@@ -842,10 +812,15 @@ root.addEventListener('click', (event) => {
         }
         if (action === 'filter') {
             state.taskFilter = value;
-            await resetTasks();
+            state.taskSelected.clear();
+            lastSelected = -1;
+            state.taskTop = 0;
+            const viewport = root.querySelector('.viewport');
+            if (viewport) viewport.scrollTop = 0;
+            render();
         }
         if (action === 'refresh-tasks') await resetTasks();
-        if (action === 'load-more') await (state.view === 'downloads' ? tasks : catalog).load();
+        if (action === 'load-more' && state.view !== 'downloads') await catalog.load();
         if (action === 'open')
             await openItem(catalog.items.find((item) => identity(item) === value));
         if (action === 'back') {
@@ -865,15 +840,19 @@ root.addEventListener('click', (event) => {
             await enqueue(catalog.items.filter((item) => identity(item) === value));
         if (action === 'download-selected') await enqueue(selectedItems());
         if (action === 'recover-submission') {
-            await recoverSubmission();
+            await submission.confirm();
             announce('提交结果已确认');
         }
         if (action === 'preview')
-            await preview(catalog.items.find((item) => identity(item) === value));
+            await player.play(
+                catalog.items.find((item) => identity(item) === value),
+                displayName(catalog.items.find((item) => identity(item) === value)),
+            );
         if (action === 'stop-preview') {
-            stopPreview();
+            player?.stop();
             render();
         }
+        if (action === 'switch-preview') await player.switchSource();
         if (action === 'open-folder') await openDownloads(session.downloads);
         if (action === 'pause-queue') {
             const { data } = await api.request('/admin/download-policy', {
@@ -886,25 +865,54 @@ root.addEventListener('click', (event) => {
         if (action.startsWith('task-')) await taskAction(action.slice(5), [...state.taskSelected]);
         if (action.startsWith('credential-')) {
             const credential = state.credentials.find((c) => c.credential_id === value);
-            if (action === 'credential-default')
-                await api.request(`/credential-defaults/${encodeURIComponent(credential.source)}`, {
-                    method: 'PUT',
-                    body: { credential_id: value },
-                });
+            if (action === 'credential-edit' || action === 'credential-new') {
+                editCredential(value);
+                return;
+            }
+            if (action === 'credential-refresh') {
+                await credentials();
+                return;
+            }
+            if (!credential) return;
             if (action === 'credential-verify') {
-                const { data } = await api.request(
-                    `/credentials/${encodeURIComponent(value)}/verify`,
-                    { method: 'POST' },
-                );
-                announce(
-                    `验证结果：${{ valid: '有效', invalid: '无效', unknown: '暂时无法确认' }[data.result] || '未知'}`,
+                await changeAccount(
+                    () =>
+                        api.request(`/credentials/${encodeURIComponent(value)}/verify`, {
+                            method: 'POST',
+                        }),
+                    false,
                 );
             }
+            if (action === 'credential-cancel' && credential.verification?.id)
+                await changeAccount(
+                    () =>
+                        api.request(
+                            `/credentials/${encodeURIComponent(value)}/verify/${encodeURIComponent(credential.verification.id)}/cancel`,
+                            { method: 'POST' },
+                        ),
+                    false,
+                );
+            if (
+                action === 'credential-disable' &&
+                (!credential.enabled ||
+                    confirm('停用会清除该账号的 Cookie，再次启用需重新填写。继续？'))
+            )
+                await changeAccount(() =>
+                    api.request(`/credentials/${encodeURIComponent(value)}/disable`, {
+                        method: 'POST',
+                    }),
+                );
             if (action === 'credential-delete' && confirm('删除此凭据？'))
-                await api.request(`/credentials/${encodeURIComponent(value)}`, {
-                    method: 'DELETE',
-                });
-            await credentials();
+                await changeAccount(() =>
+                    api.request(`/credentials/${encodeURIComponent(value)}`, {
+                        method: 'DELETE',
+                    }),
+                );
+            if (
+                state.credentialId &&
+                !state.credentials.some((item) => item.credential_id === state.credentialId)
+            )
+                editCredential('');
         }
     });
 });
@@ -912,11 +920,7 @@ root.addEventListener('contextmenu', (event) => {
     const row = event.target.closest('[data-task]');
     if (!row) return;
     event.preventDefault();
-    menu(
-        tasks.items.find((task) => task.task_id === row.dataset.task),
-        event.clientX,
-        event.clientY,
-    );
+    menu(tasks.get(row.dataset.task), event.clientX, event.clientY);
 });
 document.addEventListener('pointerdown', (event) => {
     if (!event.target.closest('.context-menu,[data-action^="menu:"]')) closeMenu();
@@ -924,7 +928,7 @@ document.addEventListener('pointerdown', (event) => {
 document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
         closeMenu();
-        stopPreview();
+        player?.stop();
         render();
     }
     if (event.target.closest('input,textarea,select') || state.view !== 'downloads') return;
@@ -962,13 +966,13 @@ root.addEventListener(
         cancelAnimationFrame(frame);
         frame = requestAnimationFrame(() => {
             updateHTML(viewport, listHTML(downloads));
-            const pager = downloads ? tasks : catalog;
             if (
+                !downloads &&
                 viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 240 &&
-                pager.hasMore &&
-                !pager.error
+                catalog.hasMore &&
+                !catalog.error
             )
-                void pager.load();
+                void catalog.load();
         });
     },
     true,
@@ -985,11 +989,17 @@ async function start() {
     try {
         session = await bootService();
         api = new Api(session);
+        accounts = new Accounts(api, () => {
+            state.credentials = accounts.items;
+            if (state.view === 'settings') render();
+        });
         const saved = await readPreferences();
         Object.assign(state.settings, saved.settings || {});
         state.hidden = new Set(saved.hidden || []);
         state.names = saved.names || {};
-        state.pending = saved.pending || null;
+        submission = new DownloadSubmission(api, persist, saved.pending || null);
+        player = new Preview(api, render, announce);
+        taskSync = new TaskSync(api, tasks, render);
         const [providers, destinations, policy] = await Promise.all([
             api.request('/providers', { query: { limit: 100 } }),
             api.request('/destinations'),
@@ -1020,7 +1030,7 @@ async function start() {
                     render();
                 }
             },
-            receiveTask,
+            (event) => taskSync.receive(event),
         );
     } catch (error) {
         state.startupError = error.message || '本机服务启动失败';
@@ -1028,7 +1038,9 @@ async function start() {
     }
 }
 window.addEventListener('beforeunload', () => {
+    tasks.controller.abort();
+    accounts?.stop();
     stopWatch?.();
-    stopPreview();
+    player?.stop();
 });
 void start();

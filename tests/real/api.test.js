@@ -46,12 +46,22 @@ describe('real service contracts', () => {
         const fetcher = vi.fn(async () => ({
             ok: false,
             status: 409,
-            json: async () => ({ error: { code: 'TASK_FINALIZING', message: '保存中' } }),
+            json: async () => ({
+                error: {
+                    code: 'TASK_FINALIZING',
+                    message: '保存中',
+                    details: [{ field: 'attempted_sources', reason: 'qq' }],
+                },
+            }),
         }));
         const api = new Api({ api_base_url: 'http://127.0.0.1:1', token: 'test' }, fetcher);
         await expect(
             api.request('/downloads/id/cancel', { method: 'POST', key: 'same-key' }),
-        ).rejects.toMatchObject({ code: 'TASK_FINALIZING', status: 409 });
+        ).rejects.toMatchObject({
+            code: 'TASK_FINALIZING',
+            status: 409,
+            details: [{ field: 'attempted_sources', reason: 'qq' }],
+        });
         expect(fetcher.mock.calls[0][1].headers['Idempotency-Key']).toBe('same-key');
     });
     it('submits service refs and quality policy without presentation fields', () => {

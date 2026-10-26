@@ -28,6 +28,7 @@ vi.mock('@neutralinojs/lib', () => ({
 }));
 import { resources } from '@neutralinojs/lib';
 import { resolveServiceBinary } from '../../src/service-binary.js';
+import { SERVICE_VERSION } from '../../src/service-version.js';
 
 const payload = Buffer.from('test service binary');
 const manifest = {
@@ -104,7 +105,7 @@ it('rejects an invalid packaged manifest instead of using an external executable
 
 it('uses the explicitly provisioned binary during development', async () => {
     expect(await resolveServiceBinary(directory, { NL_OS: 'Windows', NL_PATH: directory })).toBe(
-        path.join(directory, 'bin', 'service', 'music-service.exe'),
+        path.join(directory, 'bin', 'service', SERVICE_VERSION, 'music-service.exe'),
     );
     expect(resources.extractFile).not.toHaveBeenCalled();
 });
