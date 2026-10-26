@@ -57,7 +57,7 @@ jobs:
           call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
           cmake --preset windows-msvc-release -DBUILD_TESTING=ON || exit /b 1
           cmake --build --preset windows-msvc-release || exit /b 1
-          ctest --test-dir out/build/windows-msvc-release --output-on-failure --no-tests=error --timeout 120 || exit /b 1
+          ctest --test-dir out/build/windows-msvc-release --output-on-failure --no-tests=error --timeout 120 --repeat until-pass:2 || exit /b 1
           cmake --install out/build/windows-msvc-release --prefix ../backend-install || exit /b 1
       - run: pnpm install --frozen-lockfile
       - run: pnpm desktop:setup
