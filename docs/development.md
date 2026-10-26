@@ -2,6 +2,19 @@
 
 面向开发者的完整说明。项目概览和界面截图见 [README](../README.md)。
 
+## 技术栈与目录
+
+正式前端使用原生 HTML、CSS、JavaScript ES Modules、Vite 与 Neutralinojs，不引入 UI 框架。品牌图标的唯一矢量源为 `public/favicon.svg`，构建时生成窗口与 EXE 使用的 PNG。
+
+```text
+src/          正式应用
+public/       正式静态资源与品牌图标
+scripts/      本机服务、桌面构建与品牌资源脚本
+tests/        正式应用测试
+docs/         开发说明与真实界面截图
+prototype/    独立设计原型
+```
+
 ## 开发和运行
 
 使用 Node.js 24、pnpm 12.14.0。当前前端对应 music-service 0.1.30（schema 8）。先构建后端 `music_service_server`，确保 `MUSIC_SERVICE_PROVIDERS` 包含需要发布的平台；桌面生命周期要求后端支持 `--parent-pid`。
