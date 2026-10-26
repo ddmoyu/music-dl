@@ -85,6 +85,39 @@ pnpm desktop:build
 
 换源匹配、平台下载成功率排序及额度均由后台处理，不在前端搜索或猜测候选。歌曲名、完整歌手名单及版本须严格匹配，双方时长已知时差值不超过 2 秒；源耗尽明确显示失败，不放宽条件。试听保留标准品质、允许同源降级及 `allow_preview=true` 的既有策略，下载保持用户音质策略及 `allow_preview=false`。schema 8 不自动迁移旧服务数据库，前端也不会清理或覆盖旧数据。
 
+## GitHub Actions 发布
+
+应用版本以 `package.json` 为准，修改后运行 `pnpm version:sync` 同步 Neutralino 元数据。`CHANGELOG.md` 为每次发布保留 `## X.Y.Z - YYYY-MM-DD` 条目；开发中的变化先写入 `Unreleased`。
+
+`.github/workflows/release.yml` 在推送 `vX.Y.Z` tag 时执行，校验 tag 格式、前端与桌面版本、对应更新日志后，在 Windows x64 runner 上构建固定提交的 music-service。后端的仓库、完整 SHA、版本和平台列表保存在 `scripts/release-service.json`；升级后端时需同时更新此文件和 `src/service-version.js`。
+
+工作流使用 MSVC Release 和后端既有的静态 CRT 配置，运行后端 CTest、前端 `pnpm check`，再通过独立 `.desktop-build/` 工作目录生成单文件桌面包。发布前检查 PE 架构、Windows 产品与文件版本、系统 DLL 依赖、ZIP 只有一个 EXE，并从最终 EXE 中提取资源、校验内嵌后端和许可证，启动真实服务检查平台注册与鉴权。该检查不依赖线上歌曲，也不证明所有平台的实时下载成功率。
+
+构建 job 只有仓库读取权限；单独的发布 job 在取得已验证资产并重新核对 SHA256、tag、提交和发布说明后，先创建草稿并上传所有文件，再公开 Release。已存在的 Release 不会被覆盖，失败时先定位原因，不移动已发布 tag。
+
+发布资产包含：
+
+- `qudai-win_x64.exe`：可独立运行的 Windows x64 EXE。
+- `qudai-windows-x64.zip`：只含同一 EXE 的 ZIP。
+- `SHA256SUMS`：上述两个下载包的 SHA256。
+- `release-manifest.json`：同一次构建的前端提交、后端固定提交、文件大小与 SHA256。
+
+Release 说明从该版本的更新日志生成，末尾附按系统排列的下载表，链接固定到本次 tag 和实际文件名。下载计数徽章统计所有 Release 资产的下载次数，不代表安装人数。
+
+发布操作需明确授权；准备完版本、更新日志和必要检查后：
+
+```powershell
+pnpm version:sync
+pnpm check
+# 提交并推送本次发布相关改动后，确认 tag 未被使用，再推送单个 tag。
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+tag 推送成功后需等待 Actions 完成，回读实际 Release、资产和下载表，并将下载文件与同次 CI 的 `release-manifest.json` 对照。不能用另一次本地构建的哈希代替 CI 报告。
+
+首次接入或修改发布流水线时，可先手动运行该工作流并传入候选 tag（例如 `v0.1.2`），只完成构建验证，不创建 tag 或 Release。验证通过后再推送正式 tag；正式发布仍会在该 tag 对应的提交上重新构建并校验。
+
 ## 原型隔离
 
 `prototype/` 仅保留设计参考，正式代码不导入它的演示目录、队列、计时器或示例链接。默认 `dev`、`build`、`test` 和桌面命令均面向正式应用。

@@ -4,6 +4,9 @@
 
 # 曲袋
 
+[![最新版本](https://img.shields.io/github/v/release/ddmoyu/music-dl?style=flat-square)](https://github.com/ddmoyu/music-dl/releases/latest)
+[![下载次数](https://img.shields.io/github/downloads/ddmoyu/music-dl/total?style=flat-square)](https://github.com/ddmoyu/music-dl/releases)
+
 把喜欢的歌曲装进口袋。
 
 曲袋是一款轻量桌面音乐下载工具，将多平台搜索、批量下载和试听放进一个紧凑窗口。桌面端自带 music-service，启动应用即可连接本机服务。
@@ -20,16 +23,15 @@
 
 目前已验证 **Windows x64**，系统需有 **WebView2 运行时**。macOS、Linux 及其他架构尚未打包验收。
 
-当前仓库尚未发布可直接下载的成品，需要从源码构建。准备 Node.js 24、pnpm 12.14.0 和 music-service 0.1.30（schema 8）后，在项目根目录运行：
+前往 [Releases](https://github.com/ddmoyu/music-dl/releases/latest) 下载：
 
-```powershell
-pnpm install
-pnpm desktop:setup
-$env:MUSIC_SERVICE_BINARY = '<后端安装目录>/bin/music-service.exe'
-pnpm desktop:dev
-```
+| 系统    | 下载                                                                                                                                                                                                                                                                                                                         |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows | [![EXE x64](https://img.shields.io/badge/EXE-x64-2d7d9a?style=flat-square)](https://github.com/ddmoyu/music-dl/releases/download/v0.1.2/qudai-win_x64.exe)<br>[![ZIP x64](https://img.shields.io/badge/ZIP-x64-67b7d1?style=flat-square)](https://github.com/ddmoyu/music-dl/releases/download/v0.1.2/qudai-windows-x64.zip) |
 
-后端需先构建并安装，包含所需平台并支持 `--parent-pid`。完整的环境准备、后端要求及单 EXE 打包步骤见[开发与打包说明](docs/development.md)。
+EXE 可直接运行；ZIP 解压后包含同一个 EXE。无需另外安装 Node.js 或后端服务。首次运行会释放服务并创建本机配置与数据，便携包并不表示所有数据都保存在 EXE 旁。
+
+Release 中提供 `SHA256SUMS` 与构建报告，供核对下载文件。从源码运行与打包见[开发与打包说明](docs/development.md)。
 
 ## 快速使用
 

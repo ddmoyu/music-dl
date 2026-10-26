@@ -1,0 +1,16 @@
+{
+  "repository": "ddmoyu/music-service",
+  "revision": "4b1cd8d3470ba2863212763ea29b358938388b0a",
+  "version": "0.1.30",
+  "providers": [
+    "kuwo",
+    "fivesing",
+    "netease",
+    "qq",
+    "kugou",
+    "qianqian",
+    "jamendo",
+    "migu",
+    "bilibili"
+  ]
+}

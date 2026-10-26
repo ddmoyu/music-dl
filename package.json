@@ -1,7 +1,7 @@
 {
   "name": "qudai-dl",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "description": "曲袋 · 音乐下载",
   "packageManager": "pnpm@12.14.0",
@@ -17,6 +17,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm format:check && pnpm test && pnpm build",
+    "version:sync": "node scripts/release.js sync-version",
     "desktop:setup": "node scripts/desktop-setup.js",
     "desktop:dev": "pnpm desktop:prepare && pnpm build && node scripts/desktop-dev.js",
     "desktop:build": "pnpm desktop:prepare && pnpm build && node scripts/desktop-build.js package",
