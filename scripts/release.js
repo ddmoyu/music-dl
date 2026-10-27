@@ -31,8 +31,12 @@ export function releaseNotes({ tag, repository, changes }) {
     if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error('无效的 GitHub 仓库');
     const base = `https://github.com/${repository}`;
     const download = `${base}/releases/download/${tag}`;
-    const badge = (label, name) =>
-        `[![${label}](https://img.shields.io/badge/${encodeURIComponent(label.replaceAll(' ', '-'))}-2d7d9a?style=flat-square)](${download}/${name})`;
+    const badge = (label, name) => {
+        const [kind, ...message] = label.split(' ');
+        const encodePart = (value) =>
+            encodeURIComponent(value.replaceAll('_', '__').replaceAll('-', '--'));
+        return `[![${label}](https://img.shields.io/badge/${encodePart(kind)}-${encodePart(message.join(' '))}-2d7d9a?style=flat-square)](${download}/${name})`;
+    };
     return `## 更新内容\n\n${changes}\n\n## 运行要求\n\n- Windows x64：需要 WebView2 运行时，EXE 可直接运行，ZIP 包含同一个 EXE。\n- Linux x64/ARM64：以 Ubuntu 24.04 为基线，需要 GTK 3 与 WebKitGTK 4.1（libwebkit2gtk-4.1-0）。完整解压后运行 start.sh，不要单独移动可执行文件。\n- macOS Intel/Apple Silicon：最低 macOS 15，解压后将曲袋.app 拖入应用程序目录。当前仅 ad-hoc 签名，尚无 Developer ID 签名或公证。\n\n跨平台预览版，保留每个平台完整包内布局。音源可用性及账号授权以实际结果为准。旧开发版本数据库不自动迁移，升级前请阅读[数据与兼容性说明](${base}/blob/${tag}/docs/development.md#开发和运行)。\n\n[完整更新日志](${base}/blob/${tag}/CHANGELOG.md) · [SHA256 校验文件](${download}/SHA256SUMS) · [构建与资产报告](${download}/release-manifest.json)\n\n## 下载\n\n| 系统 | 下载 |\n| --- | --- |\n| Windows | ${badge('EXE x64', 'qudai-win_x64.exe')}<br>${badge('ZIP x64', 'qudai-windows-x64.zip')} |\n| Linux | ${badge('tar.gz x64', 'qudai-linux-x64.tar.gz')}<br>${badge('tar.gz ARM64', 'qudai-linux-arm64.tar.gz')} |\n| macOS | ${badge('APP Intel', 'qudai-macos-x64.zip')}<br>${badge('APP Apple Silicon', 'qudai-macos-arm64.zip')} |\n`;
 }
 

@@ -50,6 +50,10 @@ it('ends release notes with tag-specific downloads for the complete platform set
     expect(notes).not.toContain('latest/download');
     for (const name of releaseFiles) expect(notes).toContain(`/releases/download/v0.1.2/${name}`);
     expect(notes).toContain('ARM64');
+    expect(notes).toContain(
+        'https://img.shields.io/badge/APP-Apple%20Silicon-2d7d9a?style=flat-square',
+    );
+    expect(notes).not.toContain('/badge/APP-Apple-Silicon-');
     expect(notes.trim().split('\n').at(-1)).toMatch(/^\| macOS \|.*\|$/);
 });
 

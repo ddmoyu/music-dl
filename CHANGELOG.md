@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 修正 Release 下载表中 Apple Silicon 多词徽章的 URL 编码，避免下载按钮显示为 404。
+
 ## 0.1.3 - 2026-10-27
 
 - 新增 Linux x64/ARM64、macOS Intel/Apple Silicon 桌面预览包，Windows 继续提供单 EXE 和 ZIP。
