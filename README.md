@@ -5,7 +5,7 @@
 # 曲袋
 
 [![最新版本](https://img.shields.io/github/v/release/ddmoyu/music-dl?style=flat-square)](https://github.com/ddmoyu/music-dl/releases/latest)
-[![跨平台预览版](https://img.shields.io/badge/preview-v0.1.3-2d7d9a?style=flat-square)](https://github.com/ddmoyu/music-dl/releases/tag/v0.1.3)
+[![跨平台预览版](https://img.shields.io/badge/preview-v0.1.6-2d7d9a?style=flat-square)](https://github.com/ddmoyu/music-dl/releases/tag/v0.1.6)
 [![下载次数](https://img.shields.io/github/downloads/ddmoyu/music-dl/total?style=flat-square)](https://github.com/ddmoyu/music-dl/releases)
 
 把喜欢的歌曲装进口袋。
@@ -22,12 +22,12 @@
 
 ## 获取与运行
 
-跨平台预览版提供 Windows x64、Linux x64/ARM64、macOS Intel/Apple Silicon。请选择对应系统和处理器的包，保留解压后的完整布局。
+跨平台预览版提供 Windows x64、Linux x64/ARM64、macOS Intel/Apple Silicon。请选择对应系统和处理器的包，macOS 提供 DMG，Linux 提供 deb 与 AppImage。
 
-前往 [v0.1.3 跨平台预览版](https://github.com/ddmoyu/music-dl/releases/tag/v0.1.3) 下载；[Windows 稳定版](https://github.com/ddmoyu/music-dl/releases/latest)继续保留。
+前往 [v0.1.6 跨平台预览版](https://github.com/ddmoyu/music-dl/releases/tag/v0.1.6) 下载；[Windows 稳定版](https://github.com/ddmoyu/music-dl/releases/latest)继续保留。
 
 <div align="center">
-  <a href="https://github.com/ddmoyu/music-dl/releases/tag/v0.1.3"><img src="https://img.shields.io/github/downloads/ddmoyu/music-dl/v0.1.3/total?style=flat-square&amp;logo=github" alt="本版本下载次数"></a>
+  <a href="https://github.com/ddmoyu/music-dl/releases/tag/v0.1.6"><img src="https://img.shields.io/github/downloads/ddmoyu/music-dl/v0.1.6/total?style=flat-square&amp;logo=github" alt="本版本下载次数"></a>
 </div>
 
 **按系统选择下载：**
@@ -41,22 +41,24 @@
     <tr>
       <td>Windows</td>
       <td>
-        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-win_x64.exe"><img src="https://img.shields.io/badge/EXE-x64-2d7d9a.svg?logo=windows" alt="EXE x64"></a><br>
-        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-windows-x64.zip"><img src="https://img.shields.io/badge/ZIP-x64-67b7d1.svg?logo=windows" alt="ZIP x64"></a>
+        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.6/qudai-win_x64.exe"><img src="https://img.shields.io/badge/EXE-x64-2d7d9a.svg?logo=windows" alt="EXE x64"></a><br>
+        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.6/qudai-windows-x64.zip"><img src="https://img.shields.io/badge/ZIP-x64-67b7d1.svg?logo=windows" alt="ZIP x64"></a>
       </td>
     </tr>
     <tr>
       <td>macOS</td>
       <td>
-        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-macos-arm64.zip"><img src="https://img.shields.io/badge/APP%20ZIP-Apple%20Silicon-000000.svg?logo=apple" alt="APP ZIP Apple Silicon"></a><br>
-        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-macos-x64.zip"><img src="https://img.shields.io/badge/APP%20ZIP-Intel%20x64-00A9E0.svg?logo=apple" alt="APP ZIP Intel x64"></a>
+        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.6/qudai-macos-arm64.dmg"><img src="https://img.shields.io/badge/DMG-Apple%20Silicon-000000.svg?logo=apple" alt="DMG Apple Silicon"></a><br>
+        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.6/qudai-macos-x64.dmg"><img src="https://img.shields.io/badge/DMG-Intel%20x64-00A9E0.svg?logo=apple" alt="DMG Intel x64"></a>
       </td>
     </tr>
     <tr>
       <td>Linux</td>
       <td>
-        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-linux-x64.tar.gz"><img src="https://img.shields.io/badge/tar.gz-x64-f84e29.svg?logo=linux" alt="tar.gz x64"></a><br>
-        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-linux-arm64.tar.gz"><img src="https://img.shields.io/badge/tar.gz-ARM64-FF9966.svg?logo=linux" alt="tar.gz ARM64"></a>
+        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.6/qudai-linux-x64.deb"><img src="https://img.shields.io/badge/deb-x64-f84e29.svg?logo=linux" alt="deb x64"></a><br>
+        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.6/qudai-linux-arm64.deb"><img src="https://img.shields.io/badge/deb-ARM64-FF9966.svg?logo=linux" alt="deb ARM64"></a><br>
+        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.6/qudai-linux-x64.AppImage"><img src="https://img.shields.io/badge/AppImage-x64-f84e29.svg?logo=linux" alt="AppImage x64"></a><br>
+        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.6/qudai-linux-arm64.AppImage"><img src="https://img.shields.io/badge/AppImage-ARM64-FF9966.svg?logo=linux" alt="AppImage ARM64"></a>
       </td>
     </tr>
   </tbody>
@@ -64,10 +66,10 @@
 </div>
 
 - **Windows**：需要 WebView2 运行时。EXE 可直接运行；ZIP 解压后包含同一个 EXE。
-- **Linux**：以 Ubuntu 24.04 为基线，需要 GTK 3 与 WebKitGTK 4.1（`libwebkit2gtk-4.1-0`）。解压后运行 `start.sh`，不要单独移动 `qudai` 或 `service/`。
-- **macOS**：最低 macOS 15。解压后将 `曲袋.app` 拖入应用程序目录，当前仅 ad-hoc 签名，尚无 Developer ID 签名或公证。
+- **Linux**：以 Ubuntu 24.04 为基线，需要 GTK 3 与 WebKitGTK 4.1（`libwebkit2gtk-4.1-0`）。deb 使用 `sudo apt install ./文件名.deb` 安装，之后从应用菜单启动或运行 `qudai`。AppImage 添加执行权限后运行，同样需要上述系统依赖；无法使用 FUSE 时可运行 `APPIMAGE_EXTRACT_AND_RUN=1 ./文件名.AppImage`。
+- **macOS**：最低 macOS 15。打开 DMG 后将 `曲袋.app` 拖入 Applications，当前仅 ad-hoc 签名，尚无 Developer ID 签名或公证。
 
-无需另外安装 Node.js 或后端服务。运行配置和服务数据保存在系统用户目录，压缩包便携分发不表示所有数据都保存在程序旁。
+无需另外安装 Node.js 或后端服务。运行配置和服务数据保存在系统用户目录，便携分发不表示所有数据都保存在程序旁。
 
 Release 中提供 `SHA256SUMS` 与构建报告，供核对下载文件。从源码运行与打包见[开发与打包说明](docs/development.md)。
 

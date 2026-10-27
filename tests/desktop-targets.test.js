@@ -5,7 +5,7 @@ import { commandArgument } from '../src/command-argument.js';
 
 it('maps exactly the five native platforms with available backend releases', () => {
     expect(Object.keys(targets)).toHaveLength(5);
-    expect(new Set(releaseFiles).size).toBe(6);
+    expect(new Set(releaseFiles).size).toBe(8);
     for (const [id, target] of Object.entries(targets))
         expect(hostTarget(target.platform, target.arch).id).toBe(id);
     expect(() => hostTarget('win32', 'arm64')).toThrow('未支持');

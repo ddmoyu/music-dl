@@ -46,16 +46,18 @@ export function downloadTable({ tag, repository }) {
             'macOS',
             'apple',
             [
-                ['APP ZIP', 'Apple Silicon', '000000', 'qudai-macos-arm64.zip'],
-                ['APP ZIP', 'Intel x64', '00A9E0', 'qudai-macos-x64.zip'],
+                ['DMG', 'Apple Silicon', '000000', 'qudai-macos-arm64.dmg'],
+                ['DMG', 'Intel x64', '00A9E0', 'qudai-macos-x64.dmg'],
             ],
         ],
         [
             'Linux',
             'linux',
             [
-                ['tar.gz', 'x64', 'f84e29', 'qudai-linux-x64.tar.gz'],
-                ['tar.gz', 'ARM64', 'FF9966', 'qudai-linux-arm64.tar.gz'],
+                ['deb', 'x64', 'f84e29', 'qudai-linux-x64.deb'],
+                ['deb', 'ARM64', 'FF9966', 'qudai-linux-arm64.deb'],
+                ['AppImage', 'x64', 'f84e29', 'qudai-linux-x64.AppImage'],
+                ['AppImage', 'ARM64', 'FF9966', 'qudai-linux-arm64.AppImage'],
             ],
         ],
     ];
@@ -77,7 +79,7 @@ export function releaseNotes({ tag, repository, changes }) {
     const table = downloadTable({ tag, repository });
     const base = `https://github.com/${repository}`;
     const download = `${base}/releases/download/${tag}`;
-    return `## 更新内容\n\n${changes}\n\n## 运行要求\n\n- Windows x64：需要 WebView2 运行时，EXE 可直接运行，ZIP 包含同一个 EXE。\n- Linux x64/ARM64：以 Ubuntu 24.04 为基线，需要 GTK 3 与 WebKitGTK 4.1（libwebkit2gtk-4.1-0）。完整解压后运行 start.sh，不要单独移动可执行文件。\n- macOS Intel/Apple Silicon：最低 macOS 15，解压后将曲袋.app 拖入应用程序目录。当前仅 ad-hoc 签名，尚无 Developer ID 签名或公证。\n\n跨平台预览版，保留每个平台完整包内布局。音源可用性及账号授权以实际结果为准。旧开发版本数据库不自动迁移，升级前请阅读[数据与兼容性说明](${base}/blob/${tag}/docs/development.md#开发和运行)。\n\n[完整更新日志](${base}/blob/${tag}/CHANGELOG.md) · [SHA256 校验文件](${download}/SHA256SUMS) · [构建与资产报告](${download}/release-manifest.json)\n\n## 下载\n\n${table}`;
+    return `## 更新内容\n\n${changes}\n\n## 运行要求\n\n- Windows x64：需要 WebView2 运行时，EXE 可直接运行，ZIP 包含同一个 EXE。\n- Linux x64/ARM64：以 Ubuntu 24.04 为基线，需要 GTK 3 与 WebKitGTK 4.1（libwebkit2gtk-4.1-0）。deb 使用 sudo apt install ./文件名.deb 安装；AppImage 添加执行权限后运行。AppImage 同样需要系统 GTK/WebKitGTK，无法使用 FUSE 时可通过 APPIMAGE_EXTRACT_AND_RUN=1 运行。\n- macOS Intel/Apple Silicon：最低 macOS 15，打开 DMG 后将曲袋.app 拖入 Applications。当前仅 ad-hoc 签名，尚无 Developer ID 签名或公证。\n\n跨平台预览版，保留每个平台完整包内布局。音源可用性及账号授权以实际结果为准。旧开发版本数据库不自动迁移，升级前请阅读[数据与兼容性说明](${base}/blob/${tag}/docs/development.md#开发和运行)。\n\n[完整更新日志](${base}/blob/${tag}/CHANGELOG.md) · [SHA256 校验文件](${download}/SHA256SUMS) · [构建与资产报告](${download}/release-manifest.json)\n\n## 下载\n\n${table}`;
 }
 
 export async function metadata(tag) {

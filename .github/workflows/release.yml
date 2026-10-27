@@ -61,7 +61,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-0 libayatana-appindicator3-1 xvfb
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-0 libayatana-appindicator3-1 xvfb desktop-file-utils squashfs-tools
       - run: pnpm install --frozen-lockfile
       - name: Fetch and verify the pinned backend Release package
         run: node scripts/download-service.js
@@ -140,8 +140,9 @@ jobs:
           root=".desktop-build/publish/$RELEASE_TAG"
           gh release create "$RELEASE_TAG" \
             "$root/qudai-win_x64.exe" "$root/qudai-windows-x64.zip" \
-            "$root/qudai-linux-x64.tar.gz" "$root/qudai-linux-arm64.tar.gz" \
-            "$root/qudai-macos-x64.zip" "$root/qudai-macos-arm64.zip" \
+            "$root/qudai-linux-x64.deb" "$root/qudai-linux-arm64.deb" \
+            "$root/qudai-linux-x64.AppImage" "$root/qudai-linux-arm64.AppImage" \
+            "$root/qudai-macos-x64.dmg" "$root/qudai-macos-arm64.dmg" \
             "$root/SHA256SUMS" "$root/release-manifest.json" \
             --draft --verify-tag --title "曲袋 $RELEASE_TAG 跨平台预览版" \
             --notes-file "$root/release-notes.md" "${flags[@]}"

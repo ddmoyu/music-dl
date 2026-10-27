@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { hostTarget } from './desktop-targets.js';
 import { SERVICE_VERSION } from '../src/service-version.js';
+import { packageLinux } from './package-linux.js';
 
 const target = hostTarget();
 const mode = process.argv[2] || 'prepare';
@@ -88,7 +89,7 @@ if (mode === 'package') {
     await chmod(executable, 0o755);
     await copyFile(path.join(built, 'resources.neu'), path.join(appRoot, 'resources.neu'));
     await mkdir('release', { recursive: true });
-    const asset = path.resolve('release', target.assets[0]);
+    let assets;
     if (contents) {
         await mkdir(path.join(contents, 'Resources'), { recursive: true });
         await mkdir(path.join(contents, 'MacOS'), { recursive: true });
@@ -130,15 +131,31 @@ if (mode === 'package') {
             stdio: 'inherit',
         });
         execFileSync('codesign', ['--verify', '--deep', '--strict', app], { stdio: 'inherit' });
-        execFileSync('ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', app, asset]);
+        const imageRoot = path.join(stage, 'dmg');
+        await mkdir(imageRoot);
+        execFileSync('ditto', [app, path.join(imageRoot, '曲袋.app')]);
+        execFileSync('ln', ['-s', '/Applications', path.join(imageRoot, 'Applications')]);
+        assets = [path.resolve('release', target.assets[0])];
+        execFileSync(
+            'hdiutil',
+            [
+                'create',
+                '-volname',
+                `曲袋 ${config.version}`,
+                '-srcfolder',
+                imageRoot,
+                '-format',
+                'UDZO',
+                '-fs',
+                'HFS+',
+                assets[0],
+            ],
+            { stdio: 'inherit' },
+        );
+        execFileSync('hdiutil', ['verify', assets[0]], { stdio: 'inherit' });
     } else {
         await copyFile('dist/app/app-icon.png', path.join(appRoot, 'qudai.png'));
-        await writeFile(
-            path.join(appRoot, 'start.sh'),
-            '#!/bin/sh\nset -eu\ncd -- "$(dirname -- "$0")"\nexec ./qudai "$@"\n',
-            { mode: 0o755 },
-        );
-        execFileSync('tar', ['-czf', asset, '-C', path.dirname(appRoot), path.basename(appRoot)]);
+        assets = await packageLinux({ target, stage, appRoot, version: config.version });
     }
     await writeFile(
         '.desktop-build/package.json',
@@ -147,7 +164,7 @@ if (mode === 'package') {
             executable,
             resources: path.join(appRoot, 'resources.neu'),
             serviceRoot,
-            assets: [asset],
+            assets,
         }),
     );
     console.log(`${target.id}：${target.assets[0]}`);

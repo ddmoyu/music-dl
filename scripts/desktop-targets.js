@@ -19,7 +19,7 @@ export const targets = {
         runtimeSlot: 'neutralino-linux_x64',
         neuBinary: 'qudai-linux_x64',
         backend: 'linux-x86_64.tar.gz',
-        assets: ['qudai-linux-x64.tar.gz'],
+        assets: ['qudai-linux-x64.deb', 'qudai-linux-x64.AppImage'],
     },
     'linux-arm64': {
         platform: 'linux',
@@ -30,7 +30,7 @@ export const targets = {
         runtimeSlot: 'neutralino-linux_arm64',
         neuBinary: 'qudai-linux_arm64',
         backend: 'linux-arm64.tar.gz',
-        assets: ['qudai-linux-arm64.tar.gz'],
+        assets: ['qudai-linux-arm64.deb', 'qudai-linux-arm64.AppImage'],
     },
     'macos-x64': {
         platform: 'darwin',
@@ -41,7 +41,7 @@ export const targets = {
         runtimeSlot: 'neutralino-mac_universal',
         neuBinary: 'qudai-mac_universal',
         backend: 'macos-x86_64.tar.gz',
-        assets: ['qudai-macos-x64.zip'],
+        assets: ['qudai-macos-x64.dmg'],
     },
     'macos-arm64': {
         platform: 'darwin',
@@ -52,7 +52,7 @@ export const targets = {
         runtimeSlot: 'neutralino-mac_universal',
         neuBinary: 'qudai-mac_universal',
         backend: 'macos-arm64.tar.gz',
-        assets: ['qudai-macos-arm64.zip'],
+        assets: ['qudai-macos-arm64.dmg'],
     },
 };
 

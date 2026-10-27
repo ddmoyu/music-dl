@@ -1,6 +1,10 @@
 # 更新日志
 
-## Unreleased
+## 0.1.6 - 2026-10-27
+
+- macOS Intel 与 Apple Silicon 改为 DMG 分发，打开后可将曲袋.app 拖入 Applications。
+- Linux x64 与 ARM64 提供 deb 和 AppImage；deb 安装桌面入口并声明依赖，AppImage 支持免 FUSE 的解压运行模式，两种包均需要系统 GTK 3 / WebKitGTK 4.1。
+- Actions 分别验证 DMG 挂载和复制、deb 真实安装及 AppImage 解包；每种格式均启动真实桌面并验证后端随桌面退出停机，所有目标通过后才发布完整资产。
 
 - 下载表参考 FlClash，按系统分组展示彩色下载徽章、系统图标和单版本下载次数，Apple Silicon 排在 Intel 前。
 - 修正 Release 下载表中 Apple Silicon 多词徽章的 URL 编码，避免下载按钮显示为 404。

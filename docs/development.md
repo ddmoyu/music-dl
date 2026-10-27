@@ -41,19 +41,21 @@ pnpm desktop:build
 
 `scripts/desktop-targets.js` 定义五个目标及其原生 runner：
 
-| 目标                | runner           | 分发形式                                          |
-| ------------------- | ---------------- | ------------------------------------------------- |
-| Windows x64         | windows-2025     | 单 EXE、只含同一 EXE 的 ZIP                       |
-| Linux x64           | ubuntu-24.04     | 带桌面运行时、resources.neu 和 service/ 的 tar.gz |
-| Linux ARM64         | ubuntu-24.04-arm | 同上，使用 ARM64 二进制                           |
-| macOS Intel         | macos-15-intel   | 带图标、Info.plist、服务与运行库的 .app ZIP       |
-| macOS Apple Silicon | macos-15         | 同上，使用 ARM64 二进制                           |
+| 目标                | runner           | 分发形式                                       |
+| ------------------- | ---------------- | ---------------------------------------------- |
+| Windows x64         | windows-2025     | 单 EXE、只含同一 EXE 的 ZIP                    |
+| Linux x64           | ubuntu-24.04     | deb 安装包、AppImage                           |
+| Linux ARM64         | ubuntu-24.04-arm | 同上，使用 ARM64 二进制                        |
+| macOS Intel         | macos-15-intel   | DMG，包含完整曲袋.app 与 Applications 快捷入口 |
+| macOS Apple Silicon | macos-15         | 同上，使用 ARM64 二进制                        |
 
 打包在独立 `.desktop-build/` 目录完成，只复制正式构建、匹配目标的 Neutralino 二进制、经过校验的服务和第三方许可。**不要在仓库根目录直接运行 `neu build` 或 `neu update`**，它们会归档并清理 `.tmp/`。
 
 Windows 保持 `--embed-resources` 单文件。Linux/macOS 使用独立的 `resources.neu` 与随包服务，macOS 保留后端 LLVM 运行库的原始相对布局，并为完整 `.app` 做 ad-hoc 签名；没有 Developer ID 签名或公证。macOS 最低 15；Linux 以 Ubuntu 24.04 为基线，需安装 WebKitGTK 4.1 和 GTK 3；Windows 需有 WebView2。
 
 macOS 的原生入口仅定位并 `exec` 应用 Resources 目录内的 Neutralino，保持同一进程 ID；页面、服务、运行库和许可证均位于 Resources，避免资源文件被当作 MacOS 目录中的嵌套代码签名。复制后端时保留相对符号链接，不写入 CI 机器的绝对路径。
+
+Linux 打包依赖 `dpkg-deb`、`desktop-file-validate`、`squashfs-tools`。AppImage 使用官方 appimagetool 和 type2-runtime，下载工具必须匹配 `scripts/package-linux.js` 中固定的 SHA256；continuous 资产变化时直接失败，需显式复核更新。AppImage 包含桌面运行时与后端，但仍依赖宿主 GTK 3 / WebKitGTK 4.1；不宣称兼容所有发行版。没有 FUSE 时可用 `APPIMAGE_EXTRACT_AND_RUN=1`。deb 通过包管理器安装依赖、桌面入口与图标；卸载不会删除用户目录的数据。
 
 产物写入 `release/`，不能提交二进制、构建结果、运行数据或本机绝对路径。Logo 唯一矢量源为 `public/favicon.svg`，构建时生成 PNG，macOS 图标从同一 PNG 生成 ICNS。
 
@@ -63,13 +65,13 @@ macOS 的原生入口仅定位并 `exec` 应用 Resources 目录内的 Neutralin
 
 后端来源固定在 `scripts/release-service.json`：Release tag、完整源码 SHA、报告 SHA256 和五个平台资产 SHA256。升级后端需核对已发布文件，并同步此清单与 `src/service-version.js`；不使用漂移的 latest 链接或现场构建的未验证二进制。
 
-`release.yml` 在推送 `vX.Y.Z` tag 时运行：校验版本与日志，在五个原生 runner 分别检查格式、测试、构建和打包；解压最终下载包到含中文与空格的路径，核对架构、执行权限、资源、许可及运行库，并启动真实服务检查平台注册和鉴权。随后启动包内的真实桌面 WebView，确认前端启动服务，并在桌面退出后检查服务停机。Linux 使用 Xvfb 提供显示环境。
+`release.yml` 在推送 `vX.Y.Z` tag 时运行：校验版本与日志，在五个原生 runner 分别检查格式、测试、构建和打包；解压最终下载包到含中文与空格的路径，核对架构、执行权限、资源、许可及运行库，并启动真实服务检查平台注册和鉴权。随后启动包内的真实桌面 WebView，确认前端启动服务，并在桌面退出后检查服务停机。Linux 使用 Xvfb 提供显示环境，deb 在隔离 runner 上真实安装；AppImage 检查实际文件并通过解压运行模式启动；macOS 挂载只读 DMG 并将应用复制到含中文与空格的路径后启动。
 
 原生桌面检查仅允许在隔离的 CI 账号运行，避免读取本机已有用户数据。CI 启动检查不代表所有真实机器、Linux 发行版、macOS Gatekeeper 安装交互或在线音源都已逐一验收，不自动下载歌曲。
 
 每个平台生成独立资产报告，汇总 job 必须收到五个平台的全部资产，重新核对 tag、前端提交、后端固定提交、大小与 SHA256 后，才会先创建草稿、上传完整文件并公开 Release。预览版不取代现有稳定版。已存在的 Release 不会覆盖，不移动已公开 tag。
 
-每版提供六个桌面下载文件、`SHA256SUMS` 和 `release-manifest.json`。Release 正文由本版日志生成，末尾附按 Windows/Linux/macOS 分组的下载表，所有下载链接固定到对应 tag 和文件名。下载计数是资产下载次数，不是安装人数。
+每版提供八个桌面下载文件、`SHA256SUMS` 和 `release-manifest.json`。Release 正文由本版日志生成，末尾附按 Windows/Linux/macOS 分组的下载表，所有下载链接固定到对应 tag 和文件名。下载计数是资产下载次数，不是安装人数。
 
 手动运行工作流并传入候选 tag 只执行验证与资产汇总，不创建 tag 或 Release。正式发布需明确授权；通过预检并提交相关变化后，推送本次单个 tag。发布结束还需从正式 Release 下载文件，与同次 CI 报告核对，不能使用另一次本地构建的哈希替代。
 
