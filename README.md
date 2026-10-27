@@ -26,11 +26,42 @@
 
 前往 [v0.1.3 跨平台预览版](https://github.com/ddmoyu/music-dl/releases/tag/v0.1.3) 下载；[Windows 稳定版](https://github.com/ddmoyu/music-dl/releases/latest)继续保留。
 
-| 系统    | 下载                                                                                                                                                                                                    |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Windows | [EXE x64](https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-win_x64.exe) · [ZIP x64](https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-windows-x64.zip)                 |
-| Linux   | [tar.gz x64](https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-linux-x64.tar.gz) · [tar.gz ARM64](https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-linux-arm64.tar.gz) |
-| macOS   | [APP Intel](https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-macos-x64.zip) · [APP Apple Silicon](https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-macos-arm64.zip)   |
+<div align="center">
+  <a href="https://github.com/ddmoyu/music-dl/releases/tag/v0.1.3"><img src="https://img.shields.io/github/downloads/ddmoyu/music-dl/v0.1.3/total?style=flat-square&amp;logo=github" alt="本版本下载次数"></a>
+</div>
+
+**按系统选择下载：**
+
+<div align="left">
+<table>
+  <thead align="left">
+    <tr><th>系统</th><th>下载</th></tr>
+  </thead>
+  <tbody align="left">
+    <tr>
+      <td>Windows</td>
+      <td>
+        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-win_x64.exe"><img src="https://img.shields.io/badge/EXE-x64-2d7d9a.svg?logo=windows" alt="EXE x64"></a><br>
+        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-windows-x64.zip"><img src="https://img.shields.io/badge/ZIP-x64-67b7d1.svg?logo=windows" alt="ZIP x64"></a>
+      </td>
+    </tr>
+    <tr>
+      <td>macOS</td>
+      <td>
+        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-macos-arm64.zip"><img src="https://img.shields.io/badge/APP%20ZIP-Apple%20Silicon-000000.svg?logo=apple" alt="APP ZIP Apple Silicon"></a><br>
+        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-macos-x64.zip"><img src="https://img.shields.io/badge/APP%20ZIP-Intel%20x64-00A9E0.svg?logo=apple" alt="APP ZIP Intel x64"></a>
+      </td>
+    </tr>
+    <tr>
+      <td>Linux</td>
+      <td>
+        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-linux-x64.tar.gz"><img src="https://img.shields.io/badge/tar.gz-x64-f84e29.svg?logo=linux" alt="tar.gz x64"></a><br>
+        <a href="https://github.com/ddmoyu/music-dl/releases/download/v0.1.3/qudai-linux-arm64.tar.gz"><img src="https://img.shields.io/badge/tar.gz-ARM64-FF9966.svg?logo=linux" alt="tar.gz ARM64"></a>
+      </td>
+    </tr>
+  </tbody>
+</table>
+</div>
 
 - **Windows**：需要 WebView2 运行时。EXE 可直接运行；ZIP 解压后包含同一个 EXE。
 - **Linux**：以 Ubuntu 24.04 为基线，需要 GTK 3 与 WebKitGTK 4.1（`libwebkit2gtk-4.1-0`）。解压后运行 `start.sh`，不要单独移动 `qudai` 或 `service/`。

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 下载表参考 FlClash，按系统分组展示彩色下载徽章、系统图标和单版本下载次数，Apple Silicon 排在 Intel 前。
 - 修正 Release 下载表中 Apple Silicon 多词徽章的 URL 编码，避免下载按钮显示为 404。
 
 ## 0.1.3 - 2026-10-27

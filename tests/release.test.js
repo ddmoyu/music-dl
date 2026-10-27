@@ -51,10 +51,22 @@ it('ends release notes with tag-specific downloads for the complete platform set
     for (const name of releaseFiles) expect(notes).toContain(`/releases/download/v0.1.2/${name}`);
     expect(notes).toContain('ARM64');
     expect(notes).toContain(
-        'https://img.shields.io/badge/APP-Apple%20Silicon-2d7d9a?style=flat-square',
+        'https://img.shields.io/badge/APP%20ZIP-Apple%20Silicon-000000.svg?logo=apple',
     );
     expect(notes).not.toContain('/badge/APP-Apple-Silicon-');
-    expect(notes.trim().split('\n').at(-1)).toMatch(/^\| macOS \|.*\|$/);
+    expect(notes).toContain('<table>');
+    expect(notes).toContain('<td>Windows</td>');
+    expect(notes).toContain('<td>macOS</td>');
+    expect(notes).toContain('<td>Linux</td>');
+    expect(notes).not.toContain('/badge/Setup-');
+    expect(notes).not.toContain('/badge/DMG-');
+    expect(
+        notes.match(/<a href="https:\/\/github.com\/ddmoyu\/music-dl\/releases\/download\//g),
+    ).toHaveLength(6);
+    expect(notes.indexOf('alt="APP ZIP Apple Silicon"')).toBeLessThan(
+        notes.indexOf('alt="APP ZIP Intel x64"'),
+    );
+    expect(notes.trim().endsWith('</table>\n</div>')).toBe(true);
 });
 
 async function fixture() {
